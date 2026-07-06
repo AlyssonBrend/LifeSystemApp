@@ -1,7 +1,8 @@
 # Life System — PRD (Product Requirements Document)
 
-> **Versão:** 0.2 · **Data:** 06/07/2026 · **Autor:** Alysson
+> **Versão:** 0.3 · **Data:** 06/07/2026 · **Autor:** Alysson
 > **Mudanças na 0.2:** adicionada seção 4 — Sistema de Aconselhamento (finanças, dieta, treinos, estudos)
+> **Mudanças na 0.3:** adicionada seção 3.8 — Sistema de Moedas (loja de recompensas no MVP, conversão em dinheiro real na Fase 3)
 > **Status:** Rascunho para validação de escopo
 
 ---
@@ -80,14 +81,14 @@ Conjunto padrão do MVP (configurável pelo usuário depois):
 
 | Missão | Requisitos | Recompensa |
 |--------|-----------|------------|
-| 🏋️ Treinar | 1 treino registrado | +250 XP, +1 Força, +5 Disciplina |
-| 🍗 Alimentação | 200g proteína, 30g fibras, 2 frutas, 3L água (checklist) | +180 XP, +1 Vitalidade, +3 Disciplina |
-| 📖 Estudar | 2 horas | +200 XP, +2 Inteligência, +3 Disciplina |
-| 🙏 Espiritualidade | Bíblia 20min + oração 15min + gratidão 5min (checklist) | +120 XP, +2 Espírito, +3 Disciplina |
-| 💼 Trabalhar | 8 horas | +150 XP, +2 Disciplina |
-| 😴 Dormir cedo | Registrar sono antes das 23h | +50 XP, +1 Recuperação, +2 Disciplina |
+| 🏋️ Treinar | 1 treino registrado | +250 XP, +25 🪙, +1 Força, +5 Disciplina |
+| 🍗 Alimentação | 200g proteína, 30g fibras, 2 frutas, 3L água (checklist) | +180 XP, +18 🪙, +1 Vitalidade, +3 Disciplina |
+| 📖 Estudar | 2 horas | +200 XP, +20 🪙, +2 Inteligência, +3 Disciplina |
+| 🙏 Espiritualidade | Bíblia 20min + oração 15min + gratidão 5min (checklist) | +120 XP, +12 🪙, +2 Espírito, +3 Disciplina |
+| 💼 Trabalhar | 8 horas | +150 XP, +15 🪙, +2 Disciplina |
+| 😴 Dormir cedo | Registrar sono antes das 23h | +50 XP, +5 🪙, +1 Recuperação, +2 Disciplina |
 
-**Bônus de dia perfeito** (todas as missões concluídas): +100 XP extra e +1 dia de sequência protegida.
+**Bônus de dia perfeito** (todas as missões concluídas): +100 XP, +20 🪙 extra e +1 dia de sequência protegida.
 
 **Sequência (streak):** dias consecutivos com ≥1 missão principal concluída. Quebrar a sequência não tira XP (punição gera abandono), mas zera o contador e o chefe da semana **recupera 100 HP**.
 
@@ -111,7 +112,7 @@ Ataques (o que ele "quer" que você faça): ficar na cama, redes sociais, comida
 
 **Balanceamento:** dia perfeito causa ~500 de dano → chefe de 1.200 HP cai em ~3 dias bons; sobra margem para dias ruins. HP do chefe escala com o level do jogador: `HP = 800 + (level × 100)`.
 
-**Vitória:** +1.000 XP, título temporário da semana, caixa de recompensa (recompensa real definida pelo próprio jogador antes da semana começar — ex.: "episódio da série", "jantar fora").
+**Vitória:** +1.000 XP, +200 🪙, título temporário da semana, caixa de recompensa (recompensa real definida pelo próprio jogador antes da semana começar — ex.: "episódio da série", "jantar fora").
 
 **Derrota** (domingo com HP > 0): sem punição de XP; o chefe volta na semana seguinte com nome de "Preguiça Enfurecida" e +10% HP.
 
@@ -149,12 +150,48 @@ Painel do personagem no estilo RPG futurista:
 LEVEL 3 · Aprendiz da Disciplina
 Alysson
 EXP ▓▓▓▓▓▓░░░░ 425/900     HP 100% · Energia 84%
-⚡21 💪17 🧠13 🙏9 · 💰£2.380 · 🔥12 dias
-[ Missões de hoje ]  [ Chefe da semana ]  [ Conquistas ]
+⚡21 💪17 🧠13 🙏9 · 🪙340 · 💰£2.380 · 🔥12 dias
+[ Missões de hoje ]  [ Chefe da semana ]  [ Loja ]  [ Conquistas ]
 ```
 
 - **HP** = média dos últimos 7 dias de Vitalidade/Recuperação (dormir mal e comer mal "machucam").
 - **Energia** = qualidade do sono da última noite (registro manual no MVP).
+
+### 3.8 Sistema de Moedas 🪙
+
+Além de XP, toda missão concede **Moedas** — a economia do jogo. XP mede progresso (só sobe); moedas são **gastáveis** e criam decisões.
+
+**Ganho** (regra geral: `moedas = XP da missão ÷ 10`):
+
+| Fonte | Moedas |
+|-------|--------|
+| Missões diárias | +5 a +25 🪙 (tabela 3.3) |
+| Dia perfeito | +20 🪙 |
+| Level up | +50 🪙 |
+| Chefe derrotado | +200 🪙 |
+| Conquista desbloqueada | +100 🪙 |
+
+Ganho máximo teórico: ~115 🪙/dia + bônus semanais ≈ **~1.000 🪙/mês** para um jogador consistente.
+
+**Gasto — Loja de Recompensas (MVP):** o próprio jogador cadastra recompensas reais e define o preço em moedas:
+
+| Recompensa (exemplos) | Preço |
+|----------------------|-------|
+| 1 episódio de série | 50 🪙 |
+| Sobremesa livre | 80 🪙 |
+| Jogar 2h de videogame | 100 🪙 |
+| Jantar fora | 300 🪙 |
+| Comprar algo da wishlist | 800 🪙 |
+
+Isso transforma o lazer em recompensa **comprada com disciplina** em vez de culpa.
+
+**Conversão em dinheiro real (Fase 3):** as moedas **não são pagas pelo app** — elas desbloqueiam o **orçamento de recompensa do próprio jogador**. Funciona assim:
+
+1. No módulo financeiro, o jogador define um orçamento mensal de recompensa (ex.: £100 — sai da fatia "desejos" do 50/30/20);
+2. Taxa de conversão: **10 🪙 = £1** (ajustável), com teto = orçamento definido;
+3. Moedas convertidas viram "saldo liberado para gastar sem culpa"; moedas não convertidas acumulam.
+
+Assim o dinheiro é do próprio jogador, o app nunca deve nada a ninguém, e o sistema ainda **reforça** a saúde financeira (só converte quem definiu orçamento — ou seja, quem organizou as finanças). Um mês perfeito (~1.000 🪙) libera até £100 do próprio orçamento: gastar passa a ser algo que se **conquista**.
 
 ---
 
@@ -178,7 +215,7 @@ O sistema devolve um **diagnóstico gamificado**:
 | Taxa de poupança | economizado no mês ÷ renda | Vira o **Nível Financeiro** do personagem (E → D → C → B → A → S) |
 | Dívidas | juros altos primeiro (método avalanche) | "Quite primeiro o cartão (juros maiores), depois o crediário." |
 
-**Integração com o jogo:** bater a meta de poupança do mês = missão mensal (+300 XP, +3 Finanças); subir de Nível Financeiro desbloqueia conquista; a dívida quitada pode virar um "chefe" derrotado (ex.: CHEFE: Cartão de Crédito 💳).
+**Integração com o jogo:** bater a meta de poupança do mês = missão mensal (+300 XP, +30 🪙, +3 Finanças); subir de Nível Financeiro desbloqueia conquista; a dívida quitada pode virar um "chefe" derrotado (ex.: CHEFE: Cartão de Crédito 💳). É aqui que se define o **orçamento de recompensa** que habilita a conversão de moedas em dinheiro real (seção 3.8).
 
 ### 4.2 Alimentação e regime 🍗 (Fase 2)
 
@@ -236,6 +273,9 @@ DamageEvent   (id, boss_instance_id, mission_log_id, dano, criado_em)
 Achievement   (id, nome, criterio_json, icone)
 UserAchievement (id, character_id, achievement_id, desbloqueada_em)
 RewardBox     (id, character_id, descricao_recompensa_real, aberta_em)
+Wallet        (id, character_id, saldo_moedas)
+CoinTransaction (id, wallet_id, tipo, valor, origem_ref, criado_em)  # ganho/gasto/conversão — extrato auditável
+ShopItem      (id, character_id, nome, preco_moedas, ativo)
 ```
 
 Fases 2–3 adicionam: `BodyProfile` (peso, altura, idade, objetivo), `MealPlan`, `Exercise`, `WorkoutLog`, `FinanceProfile` (renda, despesas, economias, dívidas), `FinanceGoal`, `AdviceLog` (conselhos gerados e se foram seguidos), `SkillNode`, `SkillProgress`.
@@ -287,6 +327,8 @@ Fases 2–3 adicionam: `BodyProfile` (peso, altura, idade, objetivo), `MealPlan`
 | Punições gerarem abandono | Quebra de streak não tira XP; derrota para chefe não pune |
 | Responsabilidade por conselhos de saúde/finanças | Disclaimer obrigatório (seção 4.5); conselhos baseados em fórmulas consagradas; nunca prescrever medicamentos ou investimentos específicos |
 | Custo de API de IA com múltiplos usuários | Nível 1 (regras) cobre 80% do valor sem custo; IA só na Fase 4, com limite de chamadas/dia por usuário |
+| App "pagar" usuários quebrar o modelo (legal e financeiro) | Conversão de moedas usa o orçamento do próprio jogador (seção 3.8) — o app nunca movimenta nem deve dinheiro; sem gateway de pagamento |
+| Inflação de moedas desvalorizar a loja | Ganho atrelado ao XP (÷10), que já tem cap diário; extrato auditável em `CoinTransaction` |
 
 ---
 
