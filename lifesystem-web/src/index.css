@@ -1,0 +1,72 @@
+@import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@400;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* Tema único: RPG futurista escuro — azul-carvão profundo com acentos dourado/ciano */
+  :root,
+  .dark {
+    --background: 222 30% 5%;
+    --foreground: 40 25% 92%;
+    --card: 222 26% 8%;
+    --card-foreground: 40 25% 92%;
+    --popover: 222 26% 7%;
+    --popover-foreground: 40 25% 92%;
+    --primary: 43 80% 55%;
+    --primary-foreground: 222 30% 8%;
+    --secondary: 222 18% 14%;
+    --secondary-foreground: 40 25% 92%;
+    --muted: 222 18% 12%;
+    --muted-foreground: 222 10% 62%;
+    --accent: 170 65% 42%;
+    --accent-foreground: 222 30% 8%;
+    --destructive: 0 72% 45%;
+    --destructive-foreground: 40 25% 95%;
+    --border: 222 16% 18%;
+    --input: 222 16% 20%;
+    --ring: 43 80% 55%;
+    --radius: 0rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Chakra Petch', system-ui, sans-serif;
+    /* Grade sutil de fundo, estilo interface de jogo */
+    background-image:
+      radial-gradient(ellipse 80% 50% at 50% -10%, hsl(43 80% 55% / 0.06), transparent),
+      linear-gradient(hsl(222 16% 18% / 0.25) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(222 16% 18% / 0.25) 1px, transparent 1px);
+    background-size: 100% 100%, 48px 48px, 48px 48px;
+    background-attachment: fixed;
+  }
+}
+
+/* Animação da tela de LEVEL UP */
+@keyframes levelup-burst {
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+    text-shadow: 0 0 0 hsl(43 80% 55% / 0);
+  }
+  55% {
+    transform: scale(1.15);
+    opacity: 1;
+    text-shadow: 0 0 60px hsl(43 80% 55% / 0.9);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+    text-shadow: 0 0 25px hsl(43 80% 55% / 0.5);
+  }
+}
+
+.levelup-burst {
+  animation: levelup-burst 0.7s cubic-bezier(0.22, 1.4, 0.36, 1) both;
+}

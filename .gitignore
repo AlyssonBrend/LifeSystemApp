@@ -1,0 +1,19 @@
+# .NET
+bin/
+obj/
+*.user
+
+# Banco local de desenvolvimento (contém dados reais — nunca commitar)
+*.db
+*.db-shm
+*.db-wal
+
+# Node / Vite
+node_modules/
+dist/
+dev-dist/
+*.local
+
+# Ambiente
+.env
+.env.*
