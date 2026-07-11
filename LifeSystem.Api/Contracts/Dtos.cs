@@ -17,7 +17,7 @@ public record FocoEncerrarReq(bool Abandonar);
 // ---------- Estado ----------
 public record PersonagemDto(
     string Nome, int Level, int XpAtual, int XpProximoLevel, long XpTotal,
-    int Moedas, decimal Economias, int StreakDias, double MultiplicadorStreak,
+    int Moedas, decimal Economias, int StreakDias, int ProtecoesStreak, double MultiplicadorStreak,
     string? Classe, string Titulo, string EmojiTitulo,
     int Hp, int Energia, int DiasPerfeitos, int ChefesDerrotados,
     bool PodeEscolherClasse, bool BonusClasseAtivo);

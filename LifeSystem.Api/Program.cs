@@ -31,6 +31,14 @@ static string ConverterDatabaseUrl(string url)
 
 builder.Services.AddScoped<JogoService>();
 builder.Services.AddSingleton<TokenService>();
+builder.Services.AddSingleton<IRelogio, RelogioJogo>();
+
+// Sem chave não sobe: evita rodar produção com a chave de exemplo
+var jwtChave = builder.Configuration["Jwt:Chave"];
+if (string.IsNullOrWhiteSpace(jwtChave))
+    throw new InvalidOperationException(
+        "Jwt:Chave não configurada. Dev: rode 'dotnet user-secrets set Jwt:Chave <valor-aleatorio>' na pasta da API. " +
+        "Produção: defina a variável de ambiente Jwt__Chave.");
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(opt =>
@@ -42,15 +50,21 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateIssuerSigningKey = true,
             ValidIssuer = builder.Configuration["Jwt:Emissor"],
             ValidAudience = builder.Configuration["Jwt:Audiencia"],
-            IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Chave"]!)),
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtChave)),
         };
     });
 builder.Services.AddAuthorization();
 
-// O frontend roda em outra origem (Vite/celular na rede local); auth vai no header Bearer
+// Produção: restrinja às origens reais em Cors:Origens (ex.: https://lifesystem.vercel.app).
+// Sem a configuração (dev/rede local), libera qualquer origem — auth vai no header Bearer.
+var origensPermitidas = builder.Configuration.GetSection("Cors:Origens").Get<string[]>();
 builder.Services.AddCors(opt => opt.AddDefaultPolicy(p =>
-    p.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()));
+{
+    if (origensPermitidas is { Length: > 0 })
+        p.WithOrigins(origensPermitidas).AllowAnyHeader().AllowAnyMethod();
+    else
+        p.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
+}));
 
 // Railway/Render informam a porta via PORT
 if (Environment.GetEnvironmentVariable("PORT") is { } porta)
@@ -59,7 +73,7 @@ if (Environment.GetEnvironmentVariable("PORT") is { } porta)
 var app = builder.Build();
 
 using (var escopo = app.Services.CreateScope())
-    escopo.ServiceProvider.GetRequiredService<AppDb>().Database.EnsureCreated();
+    escopo.ServiceProvider.GetRequiredService<AppDb>().Database.Migrate();
 
 app.UseCors();
 app.UseAuthentication();

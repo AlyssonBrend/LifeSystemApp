@@ -55,10 +55,13 @@ function GameView({ onSair }: { onSair: () => void }) {
           toast.success(`${ev.emoji} Conquista: ${ev.nome}`, { description: '+100 🪙' })
           break
         case 'perfeito':
-          toast.success('✨ DIA PERFEITO!', { description: '+100 XP · +20 🪙' })
+          toast.success('✨ DIA PERFEITO!', { description: '+100 XP · +20 🪙 · +1 🛡️ proteção de sequência' })
           break
         case 'chefeCurou':
           toast.warning('👹 A sequência quebrou — o chefe recuperou 100 HP.')
+          break
+        case 'streakProtegida':
+          toast.info('🛡️ Sua proteção segurou a sequência — o streak sobreviveu!')
           break
         case 'focoCompleto':
           toast.success('⏱️ Ciclo de foco completo!', { description: '+50 min de estudo · +10 XP · +1 🪙' })
@@ -140,6 +143,9 @@ function GameView({ onSair }: { onSair: () => void }) {
             <span data-testid="header-moedas">🪙 <span className="text-amber-400">{fmt(p.moedas)}</span></span>
             <span>💰 <span className="text-amber-300">£{fmt(p.economias)}</span></span>
             <span data-testid="header-streak">🔥 <span className="text-orange-400">{p.streakDias} {p.streakDias === 1 ? 'dia' : 'dias'}</span></span>
+            {p.protecoesStreak > 0 && (
+              <span title="Proteções de sequência (dia perfeito)">🛡️ <span className="text-cyan-400">×{p.protecoesStreak}</span></span>
+            )}
           </div>
 
           <Button size="sm" variant="ghost" className="ml-auto text-xs text-muted-foreground" onClick={onSair}>

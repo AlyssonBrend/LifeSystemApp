@@ -21,7 +21,9 @@ public class Personagem
     public decimal Economias { get; set; }
     public int StreakDias { get; set; }
     public DateOnly? UltimoDiaComMissao { get; set; }
+    public int ProtecoesStreak { get; set; }     // dia perfeito concede +1 (PRD 3.3); cobre dias perdidos
     public string? Classe { get; set; }          // escolhida no level 5 (PRD 3.5)
+    public DateTime? ClasseEscolhidaEm { get; set; } // carência de 30 dias entre trocas (PRD 3.5)
     public string RecompensaCaixa { get; set; } = "";
     public int DiasPerfeitos { get; set; }
     public int ChefesDerrotados { get; set; }

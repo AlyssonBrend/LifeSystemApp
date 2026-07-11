@@ -10,7 +10,9 @@ tudo no código já está pronto (Dockerfile, PostgreSQL, PORT, vercel.json).
 3. Em *Settings → Root Directory*, informe `LifeSystem.Api` (o Dockerfile é detectado sozinho);
 4. No projeto, **+ New → Database → PostgreSQL** — o Railway injeta `DATABASE_URL` no serviço da API automaticamente (confira em *Variables*; se não, adicione a referência);
 5. Em *Variables* da API, adicione:
-   - `Jwt__Chave` = uma chave nova e longa (64+ caracteres aleatórios — **não** use a do appsettings.json);
+   - `Jwt__Chave` = uma chave nova e longa (64+ caracteres aleatórios) — sem ela a API se recusa a subir;
+   - `Cors__Origens__0` = a URL do site na Vercel (ex.: `https://lifesystem.vercel.app`) — restringe o CORS em produção;
+   - `Jogo__FusoHorario` = `America/Sao_Paulo` (opcional — já é o padrão; o "dia" do jogo segue o seu fuso, não o UTC do servidor);
 6. Em *Settings → Networking*, clique **Generate Domain** e copie a URL (ex.: `https://lifesystem-api.up.railway.app`);
 7. Teste: `https://SUA-API/api/saude` deve responder `{"ok":true}`.
 

@@ -10,11 +10,13 @@ namespace LifeSystem.Api.Services;
 /// Todas as regras de jogo (PRD seção 6: nunca no frontend).
 /// Cada ação sincroniza streak/chefe/foco com a data real antes de executar.
 /// </summary>
-public class JogoService(AppDb db)
+public class JogoService(AppDb db, IRelogio relogio)
 {
     private const int MinutosFoco = 50;
     private const int MinutosDescanso = 10;
     private const int ToleranciaSegundos = 30;
+    private const int MaxProtecoesStreak = 3;
+    private const int CarenciaTrocaClasseDias = 30;
 
     // ---------- Carregamento e sincronização ----------
 
@@ -31,19 +33,31 @@ public class JogoService(AppDb db)
     public async Task<List<EventoDto>> Sincronizar(Personagem p)
     {
         var eventos = new List<EventoDto>();
-        var hoje = DateOnly.FromDateTime(DateTime.Now);
+        var hoje = relogio.Hoje;
         var ontem = hoje.AddDays(-1);
 
         var chefe = await ObterChefeDaSemana(p, hoje);
 
-        // Quebrar a sequência não tira XP, mas zera o contador e o chefe recupera 100 HP (PRD 3.3)
         if (p.StreakDias > 0 && p.UltimoDiaComMissao is { } ultimo && ultimo < ontem)
         {
-            p.StreakDias = 0;
-            if (chefe.Status == "ativa")
+            var diasPerdidos = ontem.DayNumber - ultimo.DayNumber;
+            if (diasPerdidos <= p.ProtecoesStreak)
             {
-                chefe.HpAtual = Math.Min(chefe.HpMax, chefe.HpAtual + 100);
-                eventos.Add(new("chefeCurou"));
+                // Sequência protegida (PRD 3.3): proteções de dia perfeito cobrem os dias perdidos
+                p.ProtecoesStreak -= diasPerdidos;
+                p.UltimoDiaComMissao = ontem;
+                eventos.Add(new("streakProtegida"));
+            }
+            else
+            {
+                // Quebrar a sequência não tira XP, mas zera o contador e o chefe recupera 100 HP (PRD 3.3)
+                p.StreakDias = 0;
+                p.ProtecoesStreak = 0;
+                if (chefe.Status == "ativa")
+                {
+                    chefe.HpAtual = Math.Min(chefe.HpMax, chefe.HpAtual + 100);
+                    eventos.Add(new("chefeCurou"));
+                }
             }
         }
 
@@ -53,7 +67,7 @@ public class JogoService(AppDb db)
         if (sessao is not null)
         {
             var alvo = TimeSpan.FromMinutes(sessao.Tipo == "foco" ? MinutosFoco : MinutosDescanso);
-            if (DateTime.UtcNow - sessao.IniciadaEm >= alvo)
+            if (relogio.AgoraUtc - sessao.IniciadaEm >= alvo)
                 eventos.AddRange(await CompletarSessaoFoco(p, sessao, chefe));
         }
 
@@ -63,8 +77,11 @@ public class JogoService(AppDb db)
     private async Task<ChefeInstancia> ObterChefeDaSemana(Personagem p, DateOnly hoje)
     {
         var segunda = Formulas.SegundaFeiraDe(hoje);
-        var atual = await db.ChefesInstancias
-            .FirstOrDefaultAsync(c => c.PersonagemId == p.Id && c.SemanaInicio == segunda);
+        // Olha o change tracker antes do banco: o chefe pode ter sido criado nesta mesma requisição
+        var atual = db.ChefesInstancias.Local
+                        .FirstOrDefault(c => c.PersonagemId == p.Id && c.SemanaInicio == segunda)
+                    ?? await db.ChefesInstancias
+                        .FirstOrDefaultAsync(c => c.PersonagemId == p.Id && c.SemanaInicio == segunda);
         if (atual is not null) return atual;
 
         var anterior = await db.ChefesInstancias
@@ -109,7 +126,7 @@ public class JogoService(AppDb db)
 
     public async Task<EstadoDto> MontarEstado(Personagem p)
     {
-        var hoje = DateOnly.FromDateTime(DateTime.Now);
+        var hoje = relogio.Hoje;
         var chefe = await ObterChefeDaSemana(p, hoje);
         var logsHoje = await db.MissoesLog
             .Where(m => m.PersonagemId == p.Id && m.Data == hoje)
@@ -153,12 +170,12 @@ public class JogoService(AppDb db)
         FocoDto? foco = sessao is null ? null : new(
             sessao.Tipo, sessao.IniciadaEm,
             (sessao.Tipo == "foco" ? MinutosFoco : MinutosDescanso) * 60,
-            (int)(DateTime.UtcNow - sessao.IniciadaEm).TotalSeconds);
+            (int)(relogio.AgoraUtc - sessao.IniciadaEm).TotalSeconds);
 
         return new EstadoDto(
             new PersonagemDto(
                 p.Nome, p.Level, p.XpAtual, Formulas.XpParaProximoLevel(p.Level), p.XpTotal,
-                p.Moedas, p.Economias, p.StreakDias, mult,
+                p.Moedas, p.Economias, p.StreakDias, p.ProtecoesStreak, mult,
                 p.Classe, Formulas.TituloAtual(p.Level, p.Classe), Formulas.EmojiTitulo(p.Level, p.Classe),
                 hp, dormiuOntem ? 95 : 72, p.DiasPerfeitos, p.ChefesDerrotados,
                 p.Level >= 5 && p.Classe is null, bonusAtivo),
@@ -175,7 +192,7 @@ public class JogoService(AppDb db)
             p.Loja.Where(i => i.Ativo).Select(i => new ItemLojaDto(i.Id, i.Nome, i.Preco)).ToList(),
             compras,
             foco,
-            DateTime.UtcNow);
+            relogio.AgoraUtc);
     }
 
     // ---------- Atributos: proxy de consistência (PRD 3.1, MVP) ----------
@@ -251,7 +268,7 @@ public class JogoService(AppDb db)
     {
         var def = Catalogo.Missoes.FirstOrDefault(m => m.Id == missaoId)
             ?? throw new ArgumentException("Missão desconhecida");
-        var hoje = DateOnly.FromDateTime(DateTime.Now);
+        var hoje = relogio.Hoje;
         var log = await ObterLog(p, def, hoje);
         var eventos = new List<EventoDto>();
         if (log.Concluida) return eventos;
@@ -270,7 +287,7 @@ public class JogoService(AppDb db)
     {
         var def = Catalogo.Missoes.FirstOrDefault(m => m.Id == missaoId && m.Checklist is not null)
             ?? throw new ArgumentException("Missão sem checklist");
-        var hoje = DateOnly.FromDateTime(DateTime.Now);
+        var hoje = relogio.Hoje;
         var log = await ObterLog(p, def, hoje);
         var eventos = new List<EventoDto>();
         if (log.Concluida || indice < 0 || indice >= def.Checklist!.Length) return eventos;
@@ -286,8 +303,11 @@ public class JogoService(AppDb db)
 
     private async Task<MissaoLog> ObterLog(Personagem p, MissaoDef def, DateOnly data)
     {
-        var log = await db.MissoesLog
-            .FirstOrDefaultAsync(m => m.PersonagemId == p.Id && m.MissaoId == def.Id && m.Data == data);
+        // Olha o change tracker antes do banco: o log pode ter sido criado nesta mesma requisição
+        var log = db.MissoesLog.Local
+                      .FirstOrDefault(m => m.PersonagemId == p.Id && m.MissaoId == def.Id && m.Data == data)
+                  ?? await db.MissoesLog
+                      .FirstOrDefaultAsync(m => m.PersonagemId == p.Id && m.MissaoId == def.Id && m.Data == data);
         if (log is null)
         {
             log = new MissaoLog { PersonagemId = p.Id, MissaoId = def.Id, Data = data };
@@ -308,9 +328,9 @@ public class JogoService(AppDb db)
 
     private async Task ConcluirInterna(Personagem p, MissaoDef def, MissaoLog log, List<EventoDto> eventos)
     {
-        var hoje = DateOnly.FromDateTime(DateTime.Now);
+        var hoje = relogio.Hoje;
         log.Concluida = true;
-        log.ConcluidaEm = DateTime.UtcNow;
+        log.ConcluidaEm = relogio.AgoraUtc;
 
         // Streak: dias consecutivos com ≥1 missão concluída (PRD 3.3)
         if (p.UltimoDiaComMissao != hoje)
@@ -353,6 +373,7 @@ public class JogoService(AppDb db)
         if (concluidasHoje == Catalogo.Missoes.Length)
         {
             p.DiasPerfeitos++;
+            p.ProtecoesStreak = Math.Min(MaxProtecoesStreak, p.ProtecoesStreak + 1); // +1 dia de sequência protegida
             GanharMoedas(p, 20, "diaPerfeito");
             AplicarXp(p, 100, eventos);
             eventos.Add(new("perfeito"));
@@ -431,7 +452,7 @@ public class JogoService(AppDb db)
         if (ativa) throw new InvalidOperationException("Já existe uma sessão ativa");
         db.SessoesFoco.Add(new SessaoFoco
         {
-            PersonagemId = p.Id, Tipo = tipo, IniciadaEm = DateTime.UtcNow,
+            PersonagemId = p.Id, Tipo = tipo, IniciadaEm = relogio.AgoraUtc,
         });
         return [];
     }
@@ -443,17 +464,17 @@ public class JogoService(AppDb db)
             ?? throw new InvalidOperationException("Nenhuma sessão ativa");
 
         var alvoMinutos = sessao.Tipo == "foco" ? MinutosFoco : MinutosDescanso;
-        var decorrido = DateTime.UtcNow - sessao.IniciadaEm;
+        var decorrido = relogio.AgoraUtc - sessao.IniciadaEm;
 
         if (abandonar || decorrido < TimeSpan.FromMinutes(alvoMinutos) - TimeSpan.FromSeconds(ToleranciaSegundos))
         {
             // Abandono invalida o ciclo — sem punição, ele só não conta (PRD 3.9)
             sessao.Status = "abandonada";
-            sessao.EncerradaEm = DateTime.UtcNow;
+            sessao.EncerradaEm = relogio.AgoraUtc;
             return [];
         }
 
-        var hoje = DateOnly.FromDateTime(DateTime.Now);
+        var hoje = relogio.Hoje;
         var chefe = await ObterChefeDaSemana(p, hoje);
         return await CompletarSessaoFoco(p, sessao, chefe);
     }
@@ -462,12 +483,12 @@ public class JogoService(AppDb db)
     {
         var eventos = new List<EventoDto>();
         sessao.Status = "completa";
-        sessao.EncerradaEm = DateTime.UtcNow;
+        sessao.EncerradaEm = relogio.AgoraUtc;
         if (sessao.Tipo != "foco") return eventos;
 
         // Cada ciclo de 50min alimenta a missão Estudar e paga bônus de foco (+10 XP, +1 moeda)
         var defEstudar = Catalogo.Missoes.First(m => m.Id == "estudar");
-        var data = DateOnly.FromDateTime(sessao.IniciadaEm.ToLocalTime());
+        var data = relogio.DataDe(sessao.IniciadaEm);
         var log = await ObterLog(p, defEstudar, data);
         log.ProgressoMinutos += MinutosFoco;
         GanharMoedas(p, 1, "focoCiclo");
@@ -485,7 +506,19 @@ public class JogoService(AppDb db)
     {
         if (p.Level < 5) throw new InvalidOperationException("A classe é escolhida no level 5");
         if (Catalogo.Classes.All(c => c.Id != classeId)) throw new ArgumentException("Classe desconhecida");
+        if (p.Classe == classeId) return Task.FromResult(new List<EventoDto>());
+
+        // Trocar é livre, com carência de 30 dias entre trocas (PRD 3.5); a primeira escolha é sempre livre
+        if (p.Classe is not null && p.ClasseEscolhidaEm is { } em)
+        {
+            var dias = (relogio.AgoraUtc - em).TotalDays;
+            if (dias < CarenciaTrocaClasseDias)
+                throw new InvalidOperationException(
+                    $"Troca de classe em carência — disponível em {Math.Ceiling(CarenciaTrocaClasseDias - dias)} dias");
+        }
+
         p.Classe = classeId;
+        p.ClasseEscolhidaEm = relogio.AgoraUtc;
         return Task.FromResult(new List<EventoDto> { new("classe", Nome: classeId) });
     }
 

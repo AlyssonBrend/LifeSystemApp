@@ -7,7 +7,7 @@ const BASE = import.meta.env.VITE_API_URL ?? ''
 
 export interface PersonagemDto {
   nome: string; level: number; xpAtual: number; xpProximoLevel: number; xpTotal: number
-  moedas: number; economias: number; streakDias: number; multiplicadorStreak: number
+  moedas: number; economias: number; streakDias: number; protecoesStreak: number; multiplicadorStreak: number
   classe: string | null; titulo: string; emojiTitulo: string
   hp: number; energia: number; diasPerfeitos: number; chefesDerrotados: number
   podeEscolherClasse: boolean; bonusClasseAtivo: boolean
