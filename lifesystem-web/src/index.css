@@ -70,3 +70,14 @@
 .levelup-burst {
   animation: levelup-burst 0.7s cubic-bezier(0.22, 1.4, 0.36, 1) both;
 }
+
+/* Aura dourada do Avatar Transcendente (PRD 3.5) */
+@keyframes aura-pulso {
+  0%, 100% { box-shadow: inset 0 -12px 30px -18px hsl(43 80% 55% / 0.55); }
+  50% { box-shadow: inset 0 -12px 42px -14px hsl(43 80% 55% / 0.85); }
+}
+
+.aura-transcendente {
+  background: linear-gradient(180deg, hsl(43 80% 55% / 0.10), hsl(222 26% 8% / 0.6));
+  animation: aura-pulso 3s ease-in-out infinite;
+}

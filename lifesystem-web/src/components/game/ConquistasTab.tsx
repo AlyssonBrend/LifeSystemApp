@@ -12,21 +12,23 @@ export function ConquistasTab({ estado }: { estado: EstadoDto }) {
         </p>
       </div>
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-        {conquistas.map(c => (
-          <div
-            key={c.id}
-            data-testid={`conquista-${c.id}`}
-            className={`border px-4 py-3 ${c.desbloqueada ? 'border-amber-500/60 bg-amber-500/5' : 'border-border bg-card opacity-60'}`}
-          >
-            <p className="font-display text-lg">
-              {c.desbloqueada ? c.emoji : '🔒'} {c.nome} {c.desbloqueada && <span className="text-amber-400">✓</span>}
-            </p>
-            <p className="text-sm text-muted-foreground">{c.descricao}</p>
-          </div>
-        ))}
-      </div>
-      <div className="border border-border bg-card px-4 py-3 font-mono text-xs text-muted-foreground">
-        🔒 Conquista oculta: ??? <span className="italic">(alguns segredos só se revelam a quem não tem pontos fracos…)</span>
+        {conquistas.map(c => {
+          const misteriosa = c.oculta && !c.desbloqueada // a surpresa é parte da recompensa (PRD 3.5)
+          return (
+            <div
+              key={c.id}
+              data-testid={`conquista-${c.id}`}
+              className={`border px-4 py-3 ${c.desbloqueada ? 'border-amber-500/60 bg-amber-500/5' : 'border-border bg-card opacity-60'}`}
+            >
+              <p className="font-display text-lg">
+                {c.desbloqueada ? c.emoji : '🔒'} {misteriosa ? '???' : c.nome} {c.desbloqueada && <span className="text-amber-400">✓</span>}
+              </p>
+              <p className="text-sm text-muted-foreground italic">
+                {misteriosa ? 'Alguns segredos só se revelam a quem não tem pontos fracos…' : c.descricao}
+              </p>
+            </div>
+          )
+        })}
       </div>
     </div>
   )

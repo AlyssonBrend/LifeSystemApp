@@ -1,6 +1,15 @@
-# Life System — MVP (Fase 1)
+# Life System — MVP (Fase 1) ✅ completa
 
 RPG da vida real: hábitos geram XP, vícios viram chefes semanais. Regras completas no [PRD.md](PRD.md).
+
+**Estado da Fase 1:** tudo implementado — personagem (level 0 → ∞), 10 atributos como proxy de consistência,
+XP com multiplicador de streak e sequência protegida, 6 missões diárias + missão de classe, chefe semanal
+(com Enfurecido), conquistas (+1 oculta), moedas/loja, Modo Foco 50/10 com timestamps no servidor, classes
+com carência de 30 dias e a classe secreta ✨ (endgame — hoje inalcançável por design: Carisma só ganha fonte
+de dados na Fase 3). Fora do MVP por decisão do PRD: missões configuráveis ("depois"), sugestão de reclasse
+por divergência de dados (precisa do histórico de atributos da Fase 2) e tudo das Fases 2+.
+
+Suíte de testes: `dotnet test` (57 testes).
 
 ## Estrutura
 

@@ -17,6 +17,8 @@ public class JogoService(AppDb db, IRelogio relogio)
     private const int ToleranciaSegundos = 30;
     private const int MaxProtecoesStreak = 3;
     private const int CarenciaTrocaClasseDias = 30;
+    private const int DiasParaTranscender = 30;
+    private const int PisoTranscendencia = 80; // todos os 10 atributos em Elite (80+)
 
     // ---------- Carregamento e sincronização ----------
 
@@ -71,7 +73,50 @@ public class JogoService(AppDb db, IRelogio relogio)
                 eventos.AddRange(await CompletarSessaoFoco(p, sessao, chefe));
         }
 
+        await ChecarTranscendencia(p, hoje, eventos);
         return eventos;
+    }
+
+    /// <summary>
+    /// Classe oculta (PRD 3.5): os 10 atributos em 80+ mantidos por 30 dias despertam o
+    /// ✨ Avatar Transcendente (+10% XP permanente). Como atributos caem, ela pode ser perdida.
+    /// </summary>
+    private async Task ChecarTranscendencia(Personagem p, DateOnly hoje, List<EventoDto> eventos)
+    {
+        var atributos = await CalcularAtributos(p, hoje);
+        var todosElite = atributos.All(a => a.Valor >= PisoTranscendencia);
+
+        if (todosElite)
+        {
+            p.TranscendenciaDesde ??= relogio.AgoraUtc;
+            if (!p.AvatarTranscendente &&
+                relogio.AgoraUtc - p.TranscendenciaDesde >= TimeSpan.FromDays(DiasParaTranscender))
+            {
+                p.AvatarTranscendente = true;
+                eventos.Add(new("transcendencia"));
+                eventos.AddRange(await ChecarConquistas(p)); // "Sem Pontos Fracos"
+            }
+        }
+        else
+        {
+            p.TranscendenciaDesde = null;
+            if (p.AvatarTranscendente)
+            {
+                p.AvatarTranscendente = false; // manter a Transcendência exige manter a vida em dia
+                eventos.Add(new("transcendenciaPerdida"));
+            }
+        }
+    }
+
+    /// <summary>Resolve uma missão padrão ou a missão de classe do próprio personagem (PRD 3.5).</summary>
+    private MissaoDef ObterDefMissao(Personagem p, string id)
+    {
+        var def = Catalogo.Missoes.FirstOrDefault(m => m.Id == id);
+        if (def is not null) return def;
+        if (p.Classe is not null && p.Level >= 5 &&
+            Catalogo.MissoesDeClasse.TryGetValue(p.Classe, out var deClasse) && deClasse.Id == id)
+            return deClasse;
+        throw new ArgumentException("Missão desconhecida");
     }
 
     private async Task<ChefeInstancia> ObterChefeDaSemana(Personagem p, DateOnly hoje)
@@ -135,18 +180,23 @@ public class JogoService(AppDb db, IRelogio relogio)
         var mult = Formulas.MultiplicadorStreak(p.StreakDias);
         var bonusAtivo = BonusClasseAtivo(p, atributos);
 
-        var missoes = Catalogo.Missoes.Select(def =>
+        var defsDoDia = Catalogo.Missoes.AsEnumerable();
+        if (p.Classe is not null && p.Level >= 5 && Catalogo.MissoesDeClasse.TryGetValue(p.Classe, out var missaoDeClasse))
+            defsDoDia = defsDoDia.Append(missaoDeClasse);
+
+        var missoes = defsDoDia.Select(def =>
         {
             var log = logsHoje.FirstOrDefault(l => l.MissaoId == def.Id);
             var checks = LerChecks(def, log);
             var comBonus = TemBonusClasse(p, def) && bonusAtivo;
-            var xpFinal = (int)Math.Round(def.Xp * mult * (comBonus ? 1.2 : 1));
+            var xpFinal = (int)Math.Round(def.Xp * mult * (comBonus ? 1.2 : 1) * (p.AvatarTranscendente ? 1.1 : 1));
             return new MissaoDto(
                 def.Id, def.Nome, def.Emoji, def.Requisito,
                 def.Xp, xpFinal, Formulas.MoedasDeXp(xpFinal), def.DanoChefe,
                 log?.Concluida ?? false, comBonus,
                 def.Checklist, checks,
-                def.MinutosNecessarios, log?.ProgressoMinutos ?? 0);
+                def.MinutosNecessarios, log?.ProgressoMinutos ?? 0,
+                !Catalogo.IdsMissoesPadrao.Contains(def.Id));
         }).ToList();
 
         var dormiuOntem = await db.MissoesLog.AnyAsync(m =>
@@ -176,9 +226,11 @@ public class JogoService(AppDb db, IRelogio relogio)
             new PersonagemDto(
                 p.Nome, p.Level, p.XpAtual, Formulas.XpParaProximoLevel(p.Level), p.XpTotal,
                 p.Moedas, p.Economias, p.StreakDias, p.ProtecoesStreak, mult,
-                p.Classe, Formulas.TituloAtual(p.Level, p.Classe), Formulas.EmojiTitulo(p.Level, p.Classe),
+                p.Classe,
+                Formulas.TituloAtual(p.Level, p.Classe, p.AvatarTranscendente),
+                Formulas.EmojiTitulo(p.Level, p.Classe, p.AvatarTranscendente),
                 hp, dormiuOntem ? 95 : 72, p.DiasPerfeitos, p.ChefesDerrotados,
-                p.Level >= 5 && p.Classe is null, bonusAtivo),
+                p.Level >= 5 && p.Classe is null, bonusAtivo, p.AvatarTranscendente),
             atributos,
             missoes,
             new ChefeDto(
@@ -187,7 +239,7 @@ public class JogoService(AppDb db, IRelogio relogio)
                 chefe.HpAtual, chefe.HpMax, chefe.Enfurecido, chefe.Status,
                 p.RecompensaCaixa, Formulas.SegundaFeiraDe(hoje).AddDays(7).ToString("yyyy-MM-dd")),
             Catalogo.Conquistas
-                .Select(c => new ConquistaDto(c.Id, c.Nome, c.Emoji, c.Descricao, conquistasIds.Contains(c.Id)))
+                .Select(c => new ConquistaDto(c.Id, c.Nome, c.Emoji, c.Descricao, conquistasIds.Contains(c.Id), c.Oculta))
                 .ToList(),
             p.Loja.Where(i => i.Ativo).Select(i => new ItemLojaDto(i.Id, i.Nome, i.Preco)).ToList(),
             compras,
@@ -218,9 +270,11 @@ public class JogoService(AppDb db, IRelogio relogio)
         var minutosEstudo90 = logs90.Where(m => m.MissaoId == "estudar").Sum(m => m.ProgressoMinutos);
         var conhecimento = Math.Min(100, (int)Math.Round(minutosEstudo90 / 60.0 / 100.0 * 100));
 
-        // Disciplina (atributo central): streak atual + taxa de conclusão na janela de 90 dias
-        var diasJogados = Math.Max(1, logs90.Select(m => m.Data).Distinct().Count());
-        var taxaConclusao = logs90.Count(m => m.Concluida) / (double)(diasJogados * Catalogo.Missoes.Length) * 100;
+        // Disciplina (atributo central): streak atual + taxa de conclusão na janela de 90 dias.
+        // Só as 6 missões padrão entram na taxa — a missão de classe é bônus, não obrigação.
+        var logsPadrao90 = logs90.Where(m => Catalogo.IdsMissoesPadrao.Contains(m.MissaoId)).ToList();
+        var diasJogados = Math.Max(1, logsPadrao90.Select(m => m.Data).Distinct().Count());
+        var taxaConclusao = logsPadrao90.Count(m => m.Concluida) / (double)(diasJogados * Catalogo.Missoes.Length) * 100;
         var streakPts = Math.Min(100.0, p.StreakDias / 30.0 * 100);
         var disciplina = (int)Math.Round(0.6 * taxaConclusao + 0.4 * streakPts);
 
@@ -266,8 +320,7 @@ public class JogoService(AppDb db, IRelogio relogio)
 
     public async Task<List<EventoDto>> ConcluirMissao(Personagem p, string missaoId)
     {
-        var def = Catalogo.Missoes.FirstOrDefault(m => m.Id == missaoId)
-            ?? throw new ArgumentException("Missão desconhecida");
+        var def = ObterDefMissao(p, missaoId);
         var hoje = relogio.Hoje;
         var log = await ObterLog(p, def, hoje);
         var eventos = new List<EventoDto>();
@@ -285,8 +338,8 @@ public class JogoService(AppDb db, IRelogio relogio)
 
     public async Task<List<EventoDto>> MarcarCheck(Personagem p, string missaoId, int indice, bool marcado)
     {
-        var def = Catalogo.Missoes.FirstOrDefault(m => m.Id == missaoId && m.Checklist is not null)
-            ?? throw new ArgumentException("Missão sem checklist");
+        var def = ObterDefMissao(p, missaoId);
+        if (def.Checklist is null) throw new ArgumentException("Missão sem checklist");
         var hoje = relogio.Hoje;
         var log = await ObterLog(p, def, hoje);
         var eventos = new List<EventoDto>();
@@ -366,10 +419,12 @@ public class JogoService(AppDb db, IRelogio relogio)
 
         // Bônus de dia perfeito (PRD 3.3): +100 XP, +20 moedas
         var concluidasHoje = await db.MissoesLog
-            .CountAsync(m => m.PersonagemId == p.Id && m.Data == hoje && m.Concluida);
+            .CountAsync(m => m.PersonagemId == p.Id && m.Data == hoje && m.Concluida
+                             && Catalogo.IdsMissoesPadrao.Contains(m.MissaoId));
         // o log atual pode ainda não estar salvo — garante a contagem local
         concluidasHoje = Math.Max(concluidasHoje, db.ChangeTracker.Entries<MissaoLog>()
-            .Count(e => e.Entity.PersonagemId == p.Id && e.Entity.Data == hoje && e.Entity.Concluida));
+            .Count(e => e.Entity.PersonagemId == p.Id && e.Entity.Data == hoje && e.Entity.Concluida
+                        && Catalogo.IdsMissoesPadrao.Contains(e.Entity.MissaoId)));
         if (concluidasHoje == Catalogo.Missoes.Length)
         {
             p.DiasPerfeitos++;
@@ -386,6 +441,8 @@ public class JogoService(AppDb db, IRelogio relogio)
 
     private void AplicarXp(Personagem p, int quantidade, List<EventoDto> eventos)
     {
+        // Avatar Transcendente: +10% XP permanente em tudo (PRD 3.5)
+        if (p.AvatarTranscendente) quantidade = (int)Math.Round(quantidade * 1.1);
         p.XpAtual += quantidade;
         p.XpTotal += quantidade;
         while (p.XpAtual >= Formulas.XpParaProximoLevel(p.Level))
@@ -393,7 +450,7 @@ public class JogoService(AppDb db, IRelogio relogio)
             p.XpAtual -= Formulas.XpParaProximoLevel(p.Level);
             p.Level++;
             GanharMoedas(p, 50, "levelup");
-            eventos.Add(new("levelup", Titulo: Formulas.TituloAtual(p.Level, p.Classe), Level: p.Level));
+            eventos.Add(new("levelup", Titulo: Formulas.TituloAtual(p.Level, p.Classe, p.AvatarTranscendente), Level: p.Level));
         }
     }
 
@@ -429,6 +486,7 @@ public class JogoService(AppDb db, IRelogio relogio)
             ("chefe1", () => p.ChefesDerrotados >= 1),
             ("chefe10", () => p.ChefesDerrotados >= 10),
             ("poupanca10k", () => p.Economias >= 10000),
+            ("semPontosFracos", () => p.AvatarTranscendente),
         };
 
         foreach (var (id, ok) in checagens)

@@ -9,7 +9,7 @@ public record ClasseDef(string Id, string Nome, string Emoji, string[] Primarias
 
 public record ChefeDef(string Nome, string Emoji, string[] Ataques);
 
-public record ConquistaDef(string Id, string Nome, string Emoji, string Descricao);
+public record ConquistaDef(string Id, string Nome, string Emoji, string Descricao, bool Oculta = false);
 
 public record AtributoDef(string Id, string Nome, string Emoji, bool TemDadosNoMvp);
 
@@ -28,6 +28,20 @@ public static class Catalogo
         new("trabalhar", "Trabalhar", "💼", "8 horas de trabalho", 150, 0, ["financas"]),
         new("dormir", "Dormir cedo", "😴", "Registrar sono antes das 23h", 50, 150, ["recuperacao"]),
     ];
+
+    /// <summary>Ids das 6 missões padrão — dia perfeito e taxa de conclusão contam só estas.</summary>
+    public static readonly HashSet<string> IdsMissoesPadrao = Missoes.Select(m => m.Id).ToHashSet();
+
+    // Seção 3.5: 1 missão diária extra temática por classe (paga o bônus de primárias por definição)
+    public static readonly Dictionary<string, MissaoDef> MissoesDeClasse = new()
+    {
+        ["guerreiro"] = new("classe-guerreiro", "Treino de força", "⚔️", "Missão de classe: sessão dedicada de força", 150, 0, ["forca"]),
+        ["ranger"] = new("classe-ranger", "Corrida ou trilha", "🏹", "Missão de classe: corrida, trilha ou caminhada longa", 150, 0, ["resistencia"]),
+        ["mago"] = new("classe-mago", "Leitura profunda", "🧙", "Missão de classe: 30+ min de leitura sem distrações", 150, 0, ["conhecimento", "inteligencia"]),
+        ["monge"] = new("classe-monge", "Meditação longa", "🧘", "Missão de classe: 20+ min de meditação ou silêncio", 150, 0, ["espirito", "disciplina"]),
+        ["paladino"] = new("classe-paladino", "Oração e ferro", "🛡️", "Missão de classe: oração + treino no mesmo dia", 150, 0, ["espirito", "forca"]),
+        ["mercador"] = new("classe-mercador", "Revisar as finanças", "💰", "Missão de classe: revisar gastos e metas do dia", 150, 0, ["financas"]),
+    };
 
     // Seção 3.5 — classes com títulos por tier e pisos de manutenção
     public static readonly ClasseDef[] Classes =
@@ -75,6 +89,8 @@ public static class Catalogo
         new("chefe1", "Primeiro sangue", "👹", "Primeiro chefe derrotado"),
         new("chefe10", "Caçador de fraquezas", "👹", "10 chefes derrotados"),
         new("poupanca10k", "Primeiros £10.000", "💰", "£10.000 economizados"),
+        // A surpresa é parte da recompensa (PRD 3.5): aparece como ??? até despertar
+        new("semPontosFracos", "Sem Pontos Fracos", "✨", "Despertou o Avatar Transcendente", Oculta: true),
     ];
 
     // Seção 3.1 — os 10 atributos; os sem fonte de dados no MVP exibem proxy zerado
@@ -128,16 +144,19 @@ public static class Formulas
         _ => "Iniciante",
     };
 
-    public static string TituloAtual(int level, string? classeId)
+    public static string TituloAtual(int level, string? classeId, bool transcendente = false)
     {
+        if (transcendente) return "Avatar Transcendente";
         if (level < 5 || classeId is null) return "Aldeão";
         var classe = Catalogo.Classes.First(c => c.Id == classeId);
         var tier = level switch { >= 50 => 4, >= 35 => 3, >= 20 => 2, >= 10 => 1, _ => 0 };
         return classe.Titulos[tier];
     }
 
-    public static string EmojiTitulo(int level, string? classeId) =>
-        level < 5 || classeId is null ? "🌾" : Catalogo.Classes.First(c => c.Id == classeId).Emoji;
+    public static string EmojiTitulo(int level, string? classeId, bool transcendente = false) =>
+        transcendente ? "✨"
+        : level < 5 || classeId is null ? "🌾"
+        : Catalogo.Classes.First(c => c.Id == classeId).Emoji;
 
     /// <summary>Segunda-feira da semana de uma data (chefes surgem toda segunda, seção 3.4).</summary>
     public static DateOnly SegundaFeiraDe(DateOnly data)

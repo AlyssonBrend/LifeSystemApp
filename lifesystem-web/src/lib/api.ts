@@ -10,7 +10,7 @@ export interface PersonagemDto {
   moedas: number; economias: number; streakDias: number; protecoesStreak: number; multiplicadorStreak: number
   classe: string | null; titulo: string; emojiTitulo: string
   hp: number; energia: number; diasPerfeitos: number; chefesDerrotados: number
-  podeEscolherClasse: boolean; bonusClasseAtivo: boolean
+  podeEscolherClasse: boolean; bonusClasseAtivo: boolean; avatarTranscendente: boolean
 }
 
 export interface AtributoDto { id: string; nome: string; emoji: string; valor: number; faixa: string; temDados: boolean }
@@ -20,7 +20,7 @@ export interface MissaoDto {
   xpBase: number; xpFinal: number; moedasFinal: number; danoChefe: number
   concluida: boolean; bonusClasse: boolean
   checklist: string[] | null; checks: boolean[]
-  minutosNecessarios: number | null; progressoMinutos: number
+  minutosNecessarios: number | null; progressoMinutos: number; deClasse: boolean
 }
 
 export interface ChefeDto {
@@ -29,7 +29,7 @@ export interface ChefeDto {
   recompensaCaixa: string; proximaSegunda: string
 }
 
-export interface ConquistaDto { id: string; nome: string; emoji: string; descricao: string; desbloqueada: boolean }
+export interface ConquistaDto { id: string; nome: string; emoji: string; descricao: string; desbloqueada: boolean; oculta: boolean }
 export interface ItemLojaDto { id: number; nome: string; preco: number }
 export interface CompraDto { nome: string; valor: number; em: string }
 export interface FocoDto { tipo: 'foco' | 'descanso'; iniciadaEm: string; duracaoSegundos: number; decorridoSegundos: number }

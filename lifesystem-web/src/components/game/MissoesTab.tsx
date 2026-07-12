@@ -13,7 +13,8 @@ interface Props {
 export function MissoesTab({ estado, onConcluir, onCheck, onAbrirFoco }: Props) {
   const { personagem, missoesHoje } = estado
   const concluidas = missoesHoje.filter(m => m.concluida).length
-  const diaPerfeito = concluidas === missoesHoje.length
+  // Dia perfeito conta só as 6 missões padrão — a missão de classe é bônus (PRD 3.3/3.5)
+  const diaPerfeito = missoesHoje.filter(m => !m.deClasse).every(m => m.concluida)
 
   return (
     <div className="space-y-4">
@@ -38,8 +39,11 @@ export function MissoesTab({ estado, onConcluir, onCheck, onAbrirFoco }: Props) 
           <div
             key={m.id}
             data-testid={`missao-${m.id}`}
-            className={`border px-4 py-3 transition-colors ${m.concluida ? 'border-amber-500/60 bg-amber-500/5' : 'border-border bg-card'}`}
+            className={`border px-4 py-3 transition-colors ${m.concluida ? 'border-amber-500/60 bg-amber-500/5' : m.deClasse ? 'border-cyan-500/40 bg-cyan-500/5' : 'border-border bg-card'}`}
           >
+            {m.deClasse && (
+              <p className="mb-1 font-display text-[10px] uppercase tracking-[0.3em] text-cyan-400">Missão de classe</p>
+            )}
             <div className="flex items-start justify-between gap-2">
               <div>
                 <h3 className="font-display text-lg font-semibold">

@@ -24,6 +24,8 @@ public class Personagem
     public int ProtecoesStreak { get; set; }     // dia perfeito concede +1 (PRD 3.3); cobre dias perdidos
     public string? Classe { get; set; }          // escolhida no level 5 (PRD 3.5)
     public DateTime? ClasseEscolhidaEm { get; set; } // carência de 30 dias entre trocas (PRD 3.5)
+    public DateTime? TranscendenciaDesde { get; set; } // desde quando os 10 atributos estão em 80+
+    public bool AvatarTranscendente { get; set; }      // classe oculta (PRD 3.5): +10% XP permanente
     public string RecompensaCaixa { get; set; } = "";
     public int DiasPerfeitos { get; set; }
     public int ChefesDerrotados { get; set; }

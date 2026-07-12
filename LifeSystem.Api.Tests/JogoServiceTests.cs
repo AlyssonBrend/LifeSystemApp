@@ -6,51 +6,16 @@ using Microsoft.EntityFrameworkCore;
 
 namespace LifeSystem.Api.Tests;
 
-/// <summary>Relógio controlável: os testes viajam no tempo em vez de esperar dias reais.</summary>
-public class RelogioFake : IRelogio
+public class JogoServiceTests : JogoServiceTestBase
 {
-    // Segunda-feira, meio-dia em Brasília (15h UTC)
-    public DateTime AgoraUtc { get; set; } = new(2026, 7, 6, 15, 0, 0, DateTimeKind.Utc);
-    public DateOnly Hoje => DataDe(AgoraUtc);
-    public DateOnly DataDe(DateTime utc) => DateOnly.FromDateTime(utc.AddHours(-3)); // BRT fixo
-    public void AvancarDias(int dias) => AgoraUtc = AgoraUtc.AddDays(dias);
-    public void AvancarMinutos(int minutos) => AgoraUtc = AgoraUtc.AddMinutes(minutos);
-}
-
-public class JogoServiceTests : IDisposable
-{
-    private readonly SqliteConnection _conexao;
-    private readonly AppDb _db;
-    private readonly RelogioFake _relogio = new();
-    private readonly JogoService _jogo;
-    private readonly Personagem _p;
-
-    public JogoServiceTests()
-    {
-        _conexao = new SqliteConnection("DataSource=:memory:");
-        _conexao.Open();
-        _db = new AppDb(new DbContextOptionsBuilder<AppDb>().UseSqlite(_conexao).Options);
-        _db.Database.EnsureCreated();
-
-        var usuario = new Usuario { Email = "teste@teste.com", SenhaHash = "x" };
-        _db.Usuarios.Add(usuario);
-        _db.SaveChanges();
-        _p = JogoService.NovoPersonagem(usuario.Id, "Testador");
-        _db.Personagens.Add(_p);
-        _db.SaveChanges();
-
-        _jogo = new JogoService(_db, _relogio);
-    }
-
-    public void Dispose() => _conexao.Dispose();
 
     private async Task<ChefeInstancia> ChefeAtual()
     {
-        await _jogo.Sincronizar(_p);
-        await _db.SaveChangesAsync();
-        return await _db.ChefesInstancias
+        await Jogo.Sincronizar(P);
+        await Db.SaveChangesAsync();
+        return await Db.ChefesInstancias
             .OrderByDescending(c => c.SemanaInicio)
-            .FirstAsync(c => c.PersonagemId == _p.Id);
+            .FirstAsync(c => c.PersonagemId == P.Id);
     }
 
     // ---------- Missões ----------
@@ -58,13 +23,13 @@ public class JogoServiceTests : IDisposable
     [Fact]
     public async Task ConcluirTreinar_PagaXpComMultiplicadorEDanificaOChefe()
     {
-        await _jogo.Sincronizar(_p);
-        var eventos = await _jogo.ConcluirMissao(_p, "treinar");
-        await _db.SaveChangesAsync();
+        await Jogo.Sincronizar(P);
+        var eventos = await Jogo.ConcluirMissao(P, "treinar");
+        await Db.SaveChangesAsync();
 
-        Assert.Equal(1, _p.StreakDias);            // primeira missão do dia inicia a sequência
-        Assert.Equal(255, _p.XpAtual);             // 250 × 1,02
-        Assert.Equal(26, _p.Moedas);               // 255 ÷ 10
+        Assert.Equal(1, P.StreakDias);            // primeira missão do dia inicia a sequência
+        Assert.Equal(255, P.XpAtual);             // 250 × 1,02
+        Assert.Equal(26, P.Moedas);               // 255 ÷ 10
         Assert.Equal(680, (await ChefeAtual()).HpAtual); // 800 − 120
         Assert.Empty(eventos);
     }
@@ -72,39 +37,39 @@ public class JogoServiceTests : IDisposable
     [Fact]
     public async Task ConcluirMissaoDuasVezes_NaoPagaDeNovo()
     {
-        await _jogo.Sincronizar(_p);
-        await _jogo.ConcluirMissao(_p, "treinar");
-        var xp = _p.XpAtual;
-        await _jogo.ConcluirMissao(_p, "treinar");
-        Assert.Equal(xp, _p.XpAtual);
+        await Jogo.Sincronizar(P);
+        await Jogo.ConcluirMissao(P, "treinar");
+        var xp = P.XpAtual;
+        await Jogo.ConcluirMissao(P, "treinar");
+        Assert.Equal(xp, P.XpAtual);
     }
 
     [Fact]
     public async Task Checklist_SoConcluiComTodosOsItens()
     {
-        await _jogo.Sincronizar(_p);
-        await _jogo.MarcarCheck(_p, "alimentacao", 0, true);
-        await _jogo.MarcarCheck(_p, "alimentacao", 1, true);
-        await _jogo.MarcarCheck(_p, "alimentacao", 2, true);
-        Assert.Equal(0, _p.XpAtual);               // 3 de 4: nada pago ainda
+        await Jogo.Sincronizar(P);
+        await Jogo.MarcarCheck(P, "alimentacao", 0, true);
+        await Jogo.MarcarCheck(P, "alimentacao", 1, true);
+        await Jogo.MarcarCheck(P, "alimentacao", 2, true);
+        Assert.Equal(0, P.XpAtual);               // 3 de 4: nada pago ainda
 
-        await _jogo.MarcarCheck(_p, "alimentacao", 3, true);
-        Assert.Equal(184, _p.XpAtual);             // 180 × 1,02
+        await Jogo.MarcarCheck(P, "alimentacao", 3, true);
+        Assert.Equal(184, P.XpAtual);             // 180 × 1,02
     }
 
     [Fact]
     public async Task DiaPerfeito_PagaBonusEConcedeProtecao()
     {
-        await _jogo.Sincronizar(_p);
+        await Jogo.Sincronizar(P);
         var eventos = new List<Contracts.EventoDto>();
         foreach (var m in Catalogo.Missoes)
-            eventos.AddRange(await _jogo.ConcluirMissao(_p, m.Id));
-        await _db.SaveChangesAsync();
+            eventos.AddRange(await Jogo.ConcluirMissao(P, m.Id));
+        await Db.SaveChangesAsync();
 
         Assert.Contains(eventos, e => e.Tipo == "perfeito");
-        Assert.Equal(1, _p.DiasPerfeitos);
-        Assert.Equal(1, _p.ProtecoesStreak);
-        Assert.Equal(1, _p.Level);                 // ~1.069 XP no dia passa dos 500
+        Assert.Equal(1, P.DiasPerfeitos);
+        Assert.Equal(1, P.ProtecoesStreak);
+        Assert.Equal(1, P.Level);                 // ~1.069 XP no dia passa dos 500
         Assert.Contains(eventos, e => e.Tipo == "levelup" && e.Level == 1);
     }
 
@@ -113,15 +78,15 @@ public class JogoServiceTests : IDisposable
     [Fact]
     public async Task PularUmDiaSemProtecao_ZeraStreakECuraOChefe()
     {
-        await _jogo.Sincronizar(_p);
-        await _jogo.ConcluirMissao(_p, "treinar");
-        await _db.SaveChangesAsync();
+        await Jogo.Sincronizar(P);
+        await Jogo.ConcluirMissao(P, "treinar");
+        await Db.SaveChangesAsync();
 
-        _relogio.AvancarDias(2); // um dia inteiro sem missão
-        var eventos = await _jogo.Sincronizar(_p);
-        await _db.SaveChangesAsync();
+        Relogio.AvancarDias(2); // um dia inteiro sem missão
+        var eventos = await Jogo.Sincronizar(P);
+        await Db.SaveChangesAsync();
 
-        Assert.Equal(0, _p.StreakDias);
+        Assert.Equal(0, P.StreakDias);
         Assert.Contains(eventos, e => e.Tipo == "chefeCurou");
         Assert.Equal(780, (await ChefeAtual()).HpAtual); // 680 + 100
     }
@@ -129,19 +94,19 @@ public class JogoServiceTests : IDisposable
     [Fact]
     public async Task ProtecaoDeDiaPerfeito_SeguraASequencia()
     {
-        await _jogo.Sincronizar(_p);
-        foreach (var m in Catalogo.Missoes) await _jogo.ConcluirMissao(_p, m.Id);
-        await _db.SaveChangesAsync();
-        Assert.Equal(1, _p.ProtecoesStreak);
+        await Jogo.Sincronizar(P);
+        foreach (var m in Catalogo.Missoes) await Jogo.ConcluirMissao(P, m.Id);
+        await Db.SaveChangesAsync();
+        Assert.Equal(1, P.ProtecoesStreak);
 
-        _relogio.AvancarDias(2); // pulou um dia — a proteção cobre
-        var eventos = await _jogo.Sincronizar(_p);
+        Relogio.AvancarDias(2); // pulou um dia — a proteção cobre
+        var eventos = await Jogo.Sincronizar(P);
         Assert.Contains(eventos, e => e.Tipo == "streakProtegida");
-        Assert.Equal(1, _p.StreakDias);
-        Assert.Equal(0, _p.ProtecoesStreak);
+        Assert.Equal(1, P.StreakDias);
+        Assert.Equal(0, P.ProtecoesStreak);
 
-        await _jogo.ConcluirMissao(_p, "treinar");
-        Assert.Equal(2, _p.StreakDias);            // sequência continua de onde estava
+        await Jogo.ConcluirMissao(P, "treinar");
+        Assert.Equal(2, P.StreakDias);            // sequência continua de onde estava
     }
 
     // ---------- Chefe semanal ----------
@@ -151,16 +116,16 @@ public class JogoServiceTests : IDisposable
     {
         var chefe = await ChefeAtual();
         chefe.HpAtual = 100; // quase morto
-        await _db.SaveChangesAsync();
+        await Db.SaveChangesAsync();
 
-        var xpAntes = _p.XpTotal;
-        var eventos = await _jogo.ConcluirMissao(_p, "treinar"); // 120 de dano
-        await _db.SaveChangesAsync();
+        var xpAntes = P.XpTotal;
+        var eventos = await Jogo.ConcluirMissao(P, "treinar"); // 120 de dano
+        await Db.SaveChangesAsync();
 
         Assert.Contains(eventos, e => e.Tipo == "vitoria");
         Assert.Contains(eventos, e => e.Tipo == "conquista"); // Primeiro sangue
-        Assert.Equal(1, _p.ChefesDerrotados);
-        Assert.True(_p.XpTotal >= xpAntes + 1000);
+        Assert.Equal(1, P.ChefesDerrotados);
+        Assert.True(P.XpTotal >= xpAntes + 1000);
         Assert.Equal("vencida", (await ChefeAtual()).Status);
     }
 
@@ -169,29 +134,29 @@ public class JogoServiceTests : IDisposable
     {
         var chefe = await ChefeAtual();
         chefe.HpAtual = 1;
-        await _db.SaveChangesAsync();
-        await _jogo.ConcluirMissao(_p, "treinar");
-        await _db.SaveChangesAsync();
+        await Db.SaveChangesAsync();
+        await Jogo.ConcluirMissao(P, "treinar");
+        await Db.SaveChangesAsync();
 
-        _relogio.AvancarDias(7); // próxima segunda-feira
+        Relogio.AvancarDias(7); // próxima segunda-feira
         var novo = await ChefeAtual();
         Assert.Equal(1, novo.ChefeIndice);         // Preguiça → Procrastinação
         Assert.False(novo.Enfurecido);
         Assert.Equal("ativa", novo.Status);
-        Assert.Equal(Formulas.HpChefe(_p.Level), novo.HpMax);
+        Assert.Equal(Formulas.HpChefe(P.Level), novo.HpMax);
     }
 
     [Fact]
     public async Task SobreviverASemana_TrazOMesmoChefeEnfurecidoCom10PorCentoMaisHp()
     {
         var original = await ChefeAtual();
-        _relogio.AvancarDias(7); // semana passou com o chefe vivo
+        Relogio.AvancarDias(7); // semana passou com o chefe vivo
 
         var novo = await ChefeAtual();
         Assert.Equal(original.ChefeIndice, novo.ChefeIndice);
         Assert.True(novo.Enfurecido);
         Assert.Equal((int)Math.Round(original.HpMax * 1.1), novo.HpMax);
-        Assert.Equal("perdida", (await _db.ChefesInstancias.FirstAsync(c => c.Id == original.Id)).Status);
+        Assert.Equal("perdida", (await Db.ChefesInstancias.FirstAsync(c => c.Id == original.Id)).Status);
     }
 
     // ---------- Classes ----------
@@ -199,21 +164,21 @@ public class JogoServiceTests : IDisposable
     [Fact]
     public async Task TrocaDeClasse_RespeitaACarenciaDe30Dias()
     {
-        _p.Level = 5;
-        await _jogo.EscolherClasse(_p, "guerreiro");   // primeira escolha: livre
-        Assert.Equal("guerreiro", _p.Classe);
+        P.Level = 5;
+        await Jogo.EscolherClasse(P, "guerreiro");   // primeira escolha: livre
+        Assert.Equal("guerreiro", P.Classe);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => _jogo.EscolherClasse(_p, "mago"));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => Jogo.EscolherClasse(P, "mago"));
 
-        _relogio.AvancarDias(31);
-        await _jogo.EscolherClasse(_p, "mago");        // carência cumprida
-        Assert.Equal("mago", _p.Classe);
+        Relogio.AvancarDias(31);
+        await Jogo.EscolherClasse(P, "mago");        // carência cumprida
+        Assert.Equal("mago", P.Classe);
     }
 
     [Fact]
     public async Task ClasseAntesDoLevel5_EBloqueada()
     {
-        await Assert.ThrowsAsync<InvalidOperationException>(() => _jogo.EscolherClasse(_p, "guerreiro"));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => Jogo.EscolherClasse(P, "guerreiro"));
     }
 
     // ---------- Modo Foco ----------
@@ -221,36 +186,36 @@ public class JogoServiceTests : IDisposable
     [Fact]
     public async Task EncerrarFocoAntesDos50Minutos_InvalidaOCiclo()
     {
-        await _jogo.Sincronizar(_p);
-        await _jogo.IniciarFoco(_p, "foco");
-        await _db.SaveChangesAsync();
+        await Jogo.Sincronizar(P);
+        await Jogo.IniciarFoco(P, "foco");
+        await Db.SaveChangesAsync();
 
-        _relogio.AvancarMinutos(20);
-        await _jogo.EncerrarFoco(_p, abandonar: false);
-        await _db.SaveChangesAsync();
+        Relogio.AvancarMinutos(20);
+        await Jogo.EncerrarFoco(P, abandonar: false);
+        await Db.SaveChangesAsync();
 
-        var sessao = await _db.SessoesFoco.SingleAsync();
+        var sessao = await Db.SessoesFoco.SingleAsync();
         Assert.Equal("abandonada", sessao.Status);
-        Assert.Equal(0, _p.XpAtual);
+        Assert.Equal(0, P.XpAtual);
     }
 
     [Fact]
     public async Task TresCiclosDeFoco_ConcluemAMissaoEstudar()
     {
-        await _jogo.Sincronizar(_p);
+        await Jogo.Sincronizar(P);
         for (var ciclo = 0; ciclo < 3; ciclo++)
         {
-            await _jogo.IniciarFoco(_p, "foco");
-            await _db.SaveChangesAsync();
-            _relogio.AvancarMinutos(50);
-            await _jogo.EncerrarFoco(_p, abandonar: false);
-            await _db.SaveChangesAsync();
+            await Jogo.IniciarFoco(P, "foco");
+            await Db.SaveChangesAsync();
+            Relogio.AvancarMinutos(50);
+            await Jogo.EncerrarFoco(P, abandonar: false);
+            await Db.SaveChangesAsync();
         }
 
-        var log = await _db.MissoesLog.SingleAsync(m => m.MissaoId == "estudar");
+        var log = await Db.MissoesLog.SingleAsync(m => m.MissaoId == "estudar");
         Assert.Equal(150, log.ProgressoMinutos);
         Assert.True(log.Concluida);                 // completou os 120 min no 3º ciclo
-        Assert.Equal(3, await _db.SessoesFoco.CountAsync(s => s.Status == "completa"));
+        Assert.Equal(3, await Db.SessoesFoco.CountAsync(s => s.Status == "completa"));
     }
 
     // ---------- Loja ----------
@@ -258,19 +223,19 @@ public class JogoServiceTests : IDisposable
     [Fact]
     public async Task ComprarSemMoedas_EBloqueado()
     {
-        var item = _p.Loja.First();
-        await Assert.ThrowsAsync<InvalidOperationException>(() => _jogo.ComprarItem(_p, item.Id));
+        var item = P.Loja.First();
+        await Assert.ThrowsAsync<InvalidOperationException>(() => Jogo.ComprarItem(P, item.Id));
     }
 
     [Fact]
     public async Task Comprar_DebitaERegistraNoExtrato()
     {
-        _p.Moedas = 500;
-        var item = _p.Loja.First(i => i.Preco <= 500);
-        await _jogo.ComprarItem(_p, item.Id);
-        await _db.SaveChangesAsync();
+        P.Moedas = 500;
+        var item = P.Loja.First(i => i.Preco <= 500);
+        await Jogo.ComprarItem(P, item.Id);
+        await Db.SaveChangesAsync();
 
-        Assert.Equal(500 - item.Preco, _p.Moedas);
-        Assert.Single(_db.TransacoesMoedas.Where(t => t.Tipo == "gasto"));
+        Assert.Equal(500 - item.Preco, P.Moedas);
+        Assert.Single(Db.TransacoesMoedas.Where(t => t.Tipo == "gasto"));
     }
 }

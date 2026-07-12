@@ -20,7 +20,7 @@ public record PersonagemDto(
     int Moedas, decimal Economias, int StreakDias, int ProtecoesStreak, double MultiplicadorStreak,
     string? Classe, string Titulo, string EmojiTitulo,
     int Hp, int Energia, int DiasPerfeitos, int ChefesDerrotados,
-    bool PodeEscolherClasse, bool BonusClasseAtivo);
+    bool PodeEscolherClasse, bool BonusClasseAtivo, bool AvatarTranscendente);
 
 public record AtributoDto(string Id, string Nome, string Emoji, int Valor, string Faixa, bool TemDados);
 
@@ -29,14 +29,14 @@ public record MissaoDto(
     int XpBase, int XpFinal, int MoedasFinal, int DanoChefe,
     bool Concluida, bool BonusClasse,
     string[]? Checklist, bool[] Checks,
-    int? MinutosNecessarios, int ProgressoMinutos);
+    int? MinutosNecessarios, int ProgressoMinutos, bool DeClasse);
 
 public record ChefeDto(
     string Nome, string Emoji, string[] Ataques,
     int HpAtual, int HpMax, bool Enfurecido, string Status,
     string RecompensaCaixa, string ProximaSegunda);
 
-public record ConquistaDto(string Id, string Nome, string Emoji, string Descricao, bool Desbloqueada);
+public record ConquistaDto(string Id, string Nome, string Emoji, string Descricao, bool Desbloqueada, bool Oculta);
 
 public record ItemLojaDto(int Id, string Nome, int Preco);
 

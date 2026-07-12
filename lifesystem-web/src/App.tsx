@@ -63,6 +63,12 @@ function GameView({ onSair }: { onSair: () => void }) {
         case 'streakProtegida':
           toast.info('🛡️ Sua proteção segurou a sequência — o streak sobreviveu!')
           break
+        case 'transcendencia':
+          toast.success('✨ VOCÊ DESPERTOU O AVATAR TRANSCENDENTE', { description: 'Sem pontos fracos. +10% de XP permanente em tudo.', duration: 10000 })
+          break
+        case 'transcendenciaPerdida':
+          toast.warning('✨ A Transcendência se desfez — um dos atributos caiu abaixo de 80. Recupere-o.')
+          break
         case 'focoCompleto':
           toast.success('⏱️ Ciclo de foco completo!', { description: '+50 min de estudo · +10 XP · +1 🪙' })
           break
@@ -118,7 +124,7 @@ function GameView({ onSair }: { onSair: () => void }) {
   return (
     <>
       {/* Painel do personagem (PRD 3.7) */}
-      <header className="border-b border-border bg-card/60 px-4 py-4 backdrop-blur sm:px-8">
+      <header className={`border-b px-4 py-4 backdrop-blur sm:px-8 ${p.avatarTranscendente ? 'aura-transcendente border-amber-400/60' : 'border-border bg-card/60'}`}>
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-8 gap-y-3">
           <div>
             <p className="font-display text-xs uppercase tracking-[0.3em] text-amber-400" data-testid="header-titulo">
