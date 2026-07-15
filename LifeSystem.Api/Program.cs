@@ -171,6 +171,56 @@ api.MapPost("/loja/itens", (ItemLojaReq req, ClaimsPrincipal u, JogoService j, A
 api.MapPost("/loja/itens/{itemId:int}/comprar", (int itemId, ClaimsPrincipal u, JogoService j, AppDb db) =>
     ComAcao(u, j, db, p => j.ComprarItem(p, itemId)));
 
+// ---------- Fase 2 — Corpo (PRD 4.2 e 4.3) ----------
+// Mesmo fluxo do ComAcao, mas a resposta inclui o estado do módulo Corpo (a aba atualiza numa ida só)
+
+static async Task<IResult> ComCorpo(
+    ClaimsPrincipal user, JogoService jogo, AppDb db,
+    Func<Personagem, Task<List<EventoDto>>>? acao = null)
+{
+    var p = await jogo.CarregarPersonagem(UsuarioId(user));
+    var eventos = await jogo.Sincronizar(p);
+    try
+    {
+        if (acao is not null) eventos.AddRange(await acao(p));
+    }
+    catch (Exception e) when (e is ArgumentException or InvalidOperationException)
+    {
+        await db.SaveChangesAsync();
+        return Results.BadRequest(new { erro = e.Message });
+    }
+    await db.SaveChangesAsync();
+    var corpo = await jogo.MontarCorpo(p); // pode gerar o código de amigo no primeiro acesso
+    await db.SaveChangesAsync();
+    return Results.Ok(new AcaoResp(await jogo.MontarEstado(p), eventos, corpo));
+}
+
+var corpo = api.MapGroup("/corpo");
+
+corpo.MapGet("", (ClaimsPrincipal u, JogoService j, AppDb db) =>
+    ComCorpo(u, j, db));
+
+corpo.MapPut("/perfil", (PerfilReq req, ClaimsPrincipal u, JogoService j, AppDb db) =>
+    ComCorpo(u, j, db, p => j.DefinirPerfilCorporal(p, req)));
+
+corpo.MapPost("/aviso", (ClaimsPrincipal u, JogoService j, AppDb db) =>
+    ComCorpo(u, j, db, p => j.AceitarAvisoSaude(p)));
+
+corpo.MapPost("/carga", (CargaReq req, ClaimsPrincipal u, JogoService j, AppDb db) =>
+    ComCorpo(u, j, db, p => j.RegistrarCarga(p, req.ExercicioId, req.CargaKg, req.Reps)));
+
+corpo.MapPost("/cardio", (CardioReq req, ClaimsPrincipal u, JogoService j, AppDb db) =>
+    ComCorpo(u, j, db, p => j.RegistrarCardio(p, req.DistanciaKm, req.DuracaoMin)));
+
+corpo.MapPut("/ranking", (RankingOptInReq req, ClaimsPrincipal u, JogoService j, AppDb db) =>
+    ComCorpo(u, j, db, p => j.DefinirRankingOptIn(p, req.OptIn)));
+
+api.MapPost("/amigos", (AmigoReq req, ClaimsPrincipal u, JogoService j, AppDb db) =>
+    ComCorpo(u, j, db, p => j.AdicionarAmigo(p, req.Codigo)));
+
+api.MapPost("/amigos/{amizadeId:int}/responder", (int amizadeId, ResponderAmizadeReq req, ClaimsPrincipal u, JogoService j, AppDb db) =>
+    ComCorpo(u, j, db, p => j.ResponderAmizade(p, amizadeId, req.Aceitar)));
+
 app.MapGet("/api/saude", () => Results.Ok(new { ok = true, agora = DateTime.UtcNow }));
 
 app.Run();

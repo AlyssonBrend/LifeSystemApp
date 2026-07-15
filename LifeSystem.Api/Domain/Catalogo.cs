@@ -89,6 +89,14 @@ public static class Catalogo
         new("chefe1", "Primeiro sangue", "👹", "Primeiro chefe derrotado"),
         new("chefe10", "Caçador de fraquezas", "👹", "10 chefes derrotados"),
         new("poupanca10k", "Primeiros £10.000", "💰", "£10.000 economizados"),
+        // Fase 2 — força e cardio (PRD 4.3)
+        new("primeiroPr", "Primeiro PR", "💥", "Primeiro recorde pessoal registrado"),
+        new("supinoCorpo", "Supino com o peso do corpo", "🏋️", "1RM de supino igual ao seu peso corporal"),
+        new("agacha100", "Agachamento 100 kg", "🦵", "1RM estimado de 100 kg no agachamento"),
+        new("corrida5k", "Primeiros 5 km", "🏃", "Primeira corrida de 5 km"),
+        new("dez60", "10 km abaixo de 60 min", "🏃", "10 km em menos de uma hora"),
+        new("km100mes", "100 km no mês", "🛣️", "100 km acumulados em 30 dias"),
+        new("meia21k", "Primeira meia-maratona", "🏅", "21,1 km numa corrida só"),
         // A surpresa é parte da recompensa (PRD 3.5): aparece como ??? até despertar
         new("semPontosFracos", "Sem Pontos Fracos", "✨", "Despertou o Avatar Transcendente", Oculta: true),
     ];

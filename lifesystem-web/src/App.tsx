@@ -4,8 +4,9 @@ import { Button } from '@/components/ui/button'
 import { Toaster } from '@/components/ui/sonner'
 import { toast } from 'sonner'
 import { ApiErro, fmt, jogo, sessao } from '@/lib/api'
-import type { AcaoResp, EstadoDto, EventoDto } from '@/lib/api'
+import type { AcaoResp, CorpoDto, EstadoDto, EventoDto } from '@/lib/api'
 import { AuthView } from '@/AuthView'
+import { CorpoTab } from '@/components/game/CorpoTab'
 import { PainelTab } from '@/components/game/PainelTab'
 import { MissoesTab } from '@/components/game/MissoesTab'
 import { ChefeTab } from '@/components/game/ChefeTab'
@@ -35,6 +36,7 @@ function RaizComToaster({ children }: { children: React.ReactNode }) {
 
 function GameView({ onSair }: { onSair: () => void }) {
   const [estado, setEstado] = useState<EstadoDto | null>(null)
+  const [corpo, setCorpo] = useState<CorpoDto | null>(null)
   const [erro, setErro] = useState('')
   const [levelUp, setLevelUp] = useState<EventoDto | null>(null)
   const [vitoria, setVitoria] = useState<EventoDto | null>(null)
@@ -78,14 +80,21 @@ function GameView({ onSair }: { onSair: () => void }) {
         case 'compra':
           toast.info(`🎁 Recompensa comprada: ${ev.nome}. Aproveite sem culpa!`)
           break
+        case 'novoRecorde':
+          toast.success(`💥 NOVO RECORDE — ${ev.nome}`, { description: ev.titulo, duration: 6000 })
+          break
+        case 'convite':
+          toast.success(`🤝 Convite enviado para ${ev.nome}!`)
+          break
       }
     }
   }, [])
 
   const despachar = useCallback(async (acao: () => Promise<AcaoResp>) => {
     try {
-      const { estado: novo, eventos } = await acao()
+      const { estado: novo, eventos, corpo: novoCorpo } = await acao()
       setEstado(novo)
+      if (novoCorpo) setCorpo(novoCorpo)
       setErro('')
       processarEventos(eventos, novo)
     } catch (e) {
@@ -162,9 +171,10 @@ function GameView({ onSair }: { onSair: () => void }) {
 
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-8">
         <Tabs value={aba} onValueChange={setAba}>
-          <TabsList className="mb-5 grid h-auto w-full grid-cols-6 border border-border bg-card p-0 font-display">
+          <TabsList className="mb-5 grid h-auto w-full grid-cols-7 border border-border bg-card p-0 font-display">
             <TabsTrigger value="painel" className="rounded-none py-2.5 uppercase tracking-wider data-[state=active]:bg-secondary">🧬 <span className="ml-1.5 hidden md:inline">Painel</span></TabsTrigger>
             <TabsTrigger value="missoes" className="rounded-none py-2.5 uppercase tracking-wider data-[state=active]:bg-secondary">⚔️ <span className="ml-1.5 hidden md:inline">Missões</span></TabsTrigger>
+            <TabsTrigger value="corpo" className="rounded-none py-2.5 uppercase tracking-wider data-[state=active]:bg-secondary">🏋️ <span className="ml-1.5 hidden md:inline">Corpo</span></TabsTrigger>
             <TabsTrigger value="foco" className="rounded-none py-2.5 uppercase tracking-wider data-[state=active]:bg-secondary">⏱️ <span className="ml-1.5 hidden md:inline">Foco</span></TabsTrigger>
             <TabsTrigger value="chefe" className="rounded-none py-2.5 uppercase tracking-wider data-[state=active]:bg-secondary">👹 <span className="ml-1.5 hidden md:inline">Chefe</span></TabsTrigger>
             <TabsTrigger value="loja" className="rounded-none py-2.5 uppercase tracking-wider data-[state=active]:bg-secondary">🪙 <span className="ml-1.5 hidden md:inline">Loja</span></TabsTrigger>
@@ -184,6 +194,19 @@ function GameView({ onSair }: { onSair: () => void }) {
               onConcluir={id => despachar(() => jogo.concluirMissao(id))}
               onCheck={(id, i, marcado) => despachar(() => jogo.marcarCheck(id, i, marcado))}
               onAbrirFoco={() => setAba('foco')}
+            />
+          </TabsContent>
+          <TabsContent value="corpo">
+            <CorpoTab
+              corpo={corpo}
+              onCarregar={() => despachar(jogo.corpo)}
+              onPerfil={p => despachar(() => jogo.definirPerfil(p))}
+              onAviso={() => despachar(jogo.aceitarAvisoSaude)}
+              onCarga={(ex, kg, reps) => despachar(() => jogo.registrarCarga(ex, kg, reps))}
+              onCardio={(km, min) => despachar(() => jogo.registrarCardio(km, min))}
+              onOptIn={v => despachar(() => jogo.definirRankingOptIn(v))}
+              onAmigo={c => despachar(() => jogo.adicionarAmigo(c))}
+              onResponder={(id, aceitar) => despachar(() => jogo.responderAmizade(id, aceitar))}
             />
           </TabsContent>
           <TabsContent value="foco">
@@ -211,7 +234,7 @@ function GameView({ onSair }: { onSair: () => void }) {
 
       <footer className="mx-auto max-w-6xl px-4 pb-6 sm:px-8">
         <p className="text-xs text-muted-foreground">
-          Life System · MVP (Fase 1) · progresso salvo no servidor · regras do PRD v0.9
+          Life System · Fases 1–2 (Jogo + Corpo) · progresso salvo no servidor · regras do PRD v0.9
         </p>
       </footer>
 

@@ -30,12 +30,18 @@ public class Personagem
     public int DiasPerfeitos { get; set; }
     public int ChefesDerrotados { get; set; }
 
+    // Fase 2 — Corpo
+    public string? CodigoAmigo { get; set; }        // código de convite (PRD 4.3); gerado no primeiro acesso ao módulo
+    public bool RankingOptIn { get; set; }          // participar dos rankings é opt-in (PRD 4.3)
+    public DateTime? AvisoSaudeAceitoEm { get; set; } // aceite do disclaimer de dieta/treino (PRD 4.5 ⚠️)
+
     public List<MissaoLog> Missoes { get; set; } = [];
     public List<ChefeInstancia> Chefes { get; set; } = [];
     public List<ConquistaDesbloqueada> Conquistas { get; set; } = [];
     public List<ItemLoja> Loja { get; set; } = [];
     public List<TransacaoMoedas> Transacoes { get; set; } = [];
     public List<SessaoFoco> SessoesFoco { get; set; } = [];
+    public PerfilCorporal? PerfilCorporal { get; set; }
 }
 
 public class MissaoLog
@@ -88,6 +94,62 @@ public class TransacaoMoedas
     public int Valor { get; set; }
     public string Origem { get; set; } = "";     // ex.: missao:treinar, levelup, chefe, conquista:streak7, loja:Jantar fora
     public DateTime CriadoEm { get; set; } = DateTime.UtcNow;
+}
+
+// ---------- Fase 2 — Corpo (PRD 4.2 e 4.3) ----------
+
+/// <summary>Dados corporais do jogador — base do cálculo de metas nutricionais e da força relativa.</summary>
+public class PerfilCorporal
+{
+    public int Id { get; set; }
+    public int PersonagemId { get; set; }
+    public double PesoKg { get; set; }
+    public int AlturaCm { get; set; }
+    public int Idade { get; set; }
+    public string Sexo { get; set; } = "m";          // m | f
+    public string Atividade { get; set; } = "leve";  // sedentario | leve | moderado | intenso | atleta
+    public string Objetivo { get; set; } = "manter"; // emagrecer | manter | ganhar
+    public DateTime AtualizadoEm { get; set; } = DateTime.UtcNow;
+}
+
+/// <summary>Registro de carga (LiftRecord): carga × reps → 1RM estimado (Epley). Histórico de PRs.</summary>
+public class RegistroCarga
+{
+    public int Id { get; set; }
+    public int PersonagemId { get; set; }
+    public string ExercicioId { get; set; } = "";
+    public double CargaKg { get; set; }
+    public int Reps { get; set; }
+    public double Rm1 { get; set; }        // calculado no backend, nunca no frontend
+    public bool Pr { get; set; }           // era recorde no momento do registro
+    public bool PrPremiado { get; set; }   // máx. 1 PR premiado por exercício por semana (PRD 4.3)
+    public DateOnly Data { get; set; }
+    public DateTime CriadoEm { get; set; } = DateTime.UtcNow;
+}
+
+/// <summary>Registro de corrida (CardioLog): distância + tempo → pace; PR por faixa de distância.</summary>
+public class RegistroCardio
+{
+    public int Id { get; set; }
+    public int PersonagemId { get; set; }
+    public double DistanciaKm { get; set; }
+    public double DuracaoMin { get; set; }
+    public int PaceSegKm { get; set; }     // calculado no backend
+    public int? FaixaKm { get; set; }      // 1/5/10/15/21/42 — maior faixa coberta; null se < 1 km
+    public bool Pr { get; set; }
+    public bool PrPremiado { get; set; }   // máx. 1 PR premiado por faixa por semana (PRD 4.3)
+    public DateOnly Data { get; set; }
+    public DateTime CriadoEm { get; set; } = DateTime.UtcNow;
+}
+
+/// <summary>Amizade por código de convite (PRD 4.3): aceitar cria o vínculo — sem feed social.</summary>
+public class Amizade
+{
+    public int Id { get; set; }
+    public int SolicitanteId { get; set; }
+    public int ConvidadoId { get; set; }
+    public string Status { get; set; } = "pendente"; // pendente | aceita
+    public DateTime CriadaEm { get; set; } = DateTime.UtcNow;
 }
 
 // Timestamps no servidor — o cronômetro do frontend é só exibição (PRD 3.9, anti-trapaça)

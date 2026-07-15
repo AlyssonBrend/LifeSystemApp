@@ -46,11 +46,54 @@ export interface EstadoDto {
   agoraServidor: string
 }
 
+// ---------- Fase 2 — Corpo ----------
+
+export interface PerfilCorporalDto {
+  pesoKg: number; alturaCm: number; idade: number
+  sexo: 'm' | 'f'; atividade: string; objetivo: string
+}
+
+export interface MetasDto { calorias: number; proteinaG: number; gorduraG: number; carboG: number; fibrasG: number; aguaMl: number }
+export interface RefeicaoDto { nome: string; kcal: number; sugestao: string }
+
+export interface ExercicioDto {
+  id: string; nome: string; emoji: string; grupo: string; basico: boolean
+  melhorRm1: number | null; melhorMarca: string | null; melhorEm: string | null
+}
+
+export interface RegistroCargaDto { id: number; exercicioId: string; cargaKg: number; reps: number; rm1: number; pr: boolean; data: string }
+export interface FichaDiaDto { nome: string; exercicios: string[] }
+export interface FichaDto { id: string; nome: string; objetivo: string; frequencia: string; dias: FichaDiaDto[] }
+export interface FaixaCardioDto { faixaKm: number; melhorPaceSegKm: number | null; melhorEm: string | null }
+export interface RegistroCardioDto { id: number; distanciaKm: number; duracaoMin: number; paceSegKm: number; faixaKm: number | null; pr: boolean; data: string }
+export interface AmigoDto { amizadeId: number; nome: string; situacao: 'pendenteEnviado' | 'pendenteRecebido' | 'aceita' }
+export interface RankingEntradaDto { nome: string; valor: number; relativo: number | null; ehVoce: boolean }
+export interface RankingDto { chave: string; titulo: string; amigos: RankingEntradaDto[]; geral: RankingEntradaDto[] }
+
+export interface CorpoDto {
+  perfil: PerfilCorporalDto | null
+  metas: MetasDto | null
+  plano: RefeicaoDto[]
+  exercicios: ExercicioDto[]
+  cargas: RegistroCargaDto[]
+  fichas: FichaDto[]
+  faixasCardio: FaixaCardioDto[]
+  cardios: RegistroCardioDto[]
+  kmMes: number
+  conselhos: string[]
+  codigoAmigo: string
+  rankingOptIn: boolean
+  avisoSaudeAceito: boolean
+  amigos: AmigoDto[]
+  rankingsForca: RankingDto[]
+  rankingsCardio: RankingDto[]
+}
+
 export interface EventoDto {
   tipo: string; titulo?: string; level?: number; nome?: string; emoji?: string; recompensa?: string
 }
 
-export interface AcaoResp { estado: EstadoDto; eventos: EventoDto[] }
+export interface AcaoResp { estado: EstadoDto; eventos: EventoDto[]; corpo: CorpoDto | null }
 
 // ---------- Sessão ----------
 
@@ -120,6 +163,26 @@ export const jogo = {
     requisicao<AcaoResp>('/api/jogo/loja/itens', { method: 'POST', body: JSON.stringify({ nome, preco }) }),
   comprarItem: (itemId: number) =>
     requisicao<AcaoResp>(`/api/jogo/loja/itens/${itemId}/comprar`, { method: 'POST' }),
+
+  // ---------- Fase 2 — Corpo ----------
+  corpo: () => requisicao<AcaoResp>('/api/jogo/corpo'),
+  definirPerfil: (perfil: PerfilCorporalDto) =>
+    requisicao<AcaoResp>('/api/jogo/corpo/perfil', { method: 'PUT', body: JSON.stringify(perfil) }),
+  aceitarAvisoSaude: () =>
+    requisicao<AcaoResp>('/api/jogo/corpo/aviso', { method: 'POST' }),
+  registrarCarga: (exercicioId: string, cargaKg: number, reps: number) =>
+    requisicao<AcaoResp>('/api/jogo/corpo/carga', { method: 'POST', body: JSON.stringify({ exercicioId, cargaKg, reps }) }),
+  registrarCardio: (distanciaKm: number, duracaoMin: number) =>
+    requisicao<AcaoResp>('/api/jogo/corpo/cardio', { method: 'POST', body: JSON.stringify({ distanciaKm, duracaoMin }) }),
+  definirRankingOptIn: (optIn: boolean) =>
+    requisicao<AcaoResp>('/api/jogo/corpo/ranking', { method: 'PUT', body: JSON.stringify({ optIn }) }),
+  adicionarAmigo: (codigo: string) =>
+    requisicao<AcaoResp>('/api/jogo/amigos', { method: 'POST', body: JSON.stringify({ codigo }) }),
+  responderAmizade: (amizadeId: number, aceitar: boolean) =>
+    requisicao<AcaoResp>(`/api/jogo/amigos/${amizadeId}/responder`, { method: 'POST', body: JSON.stringify({ aceitar }) }),
 }
+
+/** Pace em s/km → "5:32" */
+export const fmtPace = (segKm: number) => `${Math.floor(segKm / 60)}:${String(segKm % 60).padStart(2, '0')}`
 
 export const fmt = (n: number) => Math.round(n).toLocaleString('pt-BR')

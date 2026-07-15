@@ -10,7 +10,7 @@ namespace LifeSystem.Api.Services;
 /// Todas as regras de jogo (PRD seção 6: nunca no frontend).
 /// Cada ação sincroniza streak/chefe/foco com a data real antes de executar.
 /// </summary>
-public class JogoService(AppDb db, IRelogio relogio)
+public partial class JogoService(AppDb db, IRelogio relogio)
 {
     private const int MinutosFoco = 50;
     private const int MinutosDescanso = 10;
@@ -27,6 +27,7 @@ public class JogoService(AppDb db, IRelogio relogio)
         var p = await db.Personagens
             .Include(x => x.Conquistas)
             .Include(x => x.Loja.Where(i => i.Ativo))
+            .Include(x => x.PerfilCorporal)
             .FirstAsync(x => x.UsuarioId == usuarioId);
         return p;
     }
@@ -184,8 +185,22 @@ public class JogoService(AppDb db, IRelogio relogio)
         if (p.Classe is not null && p.Level >= 5 && Catalogo.MissoesDeClasse.TryGetValue(p.Classe, out var missaoDeClasse))
             defsDoDia = defsDoDia.Append(missaoDeClasse);
 
+        // PRD 4.2: com perfil corporal, a missão Alimentação usa as metas calculadas em vez dos valores fixos
+        var metasChecklist = MetasDoPerfil(p);
+
         var missoes = defsDoDia.Select(def =>
         {
+            if (def.Id == "alimentacao" && metasChecklist is { } metas)
+                def = def with
+                {
+                    Checklist =
+                    [
+                        $"{metas.ProteinaG}g de proteína",
+                        $"{metas.FibrasG}g de fibras",
+                        "2 frutas",
+                        $"{(metas.AguaMl / 1000.0).ToString("0.0", CulturaPtBr)}L de água",
+                    ],
+                };
             var log = logsHoje.FirstOrDefault(l => l.MissaoId == def.Id);
             var checks = LerChecks(def, log);
             var comBonus = TemBonusClasse(p, def) && bonusAtivo;
@@ -278,10 +293,40 @@ public class JogoService(AppDb db, IRelogio relogio)
         var streakPts = Math.Min(100.0, p.StreakDias / 30.0 * 100);
         var disciplina = (int)Math.Round(0.6 * taxaConclusao + 0.4 * streakPts);
 
+        // Fase 2: fórmulas reais quando há dados (janela móvel de 90 dias — atributos podem cair,
+        // PRD 3.1); sem registros, mantém o proxy de consistência do MVP.
+        var forca = PctConsistencia30("treinar");
+        var resistencia = PctConsistencia30("treinar");
+
+        var peso = p.PerfilCorporal?.PesoKg ?? 0;
+        if (peso > 0)
+        {
+            var basicos = CatalogoCorpo.Exercicios.Where(e => e.Basico).Select(e => e.Id).ToArray();
+            var melhoresRm1 = await db.RegistrosCarga
+                .Where(r => r.PersonagemId == p.Id && r.Data >= inicio90 && basicos.Contains(r.ExercicioId))
+                .GroupBy(r => r.ExercicioId)
+                .Select(g => g.Max(r => r.Rm1))
+                .ToListAsync();
+            if (melhoresRm1.Count > 0)
+                forca = FormulasCorpo.ForcaDe(melhoresRm1.Average() / peso);
+        }
+
+        var melhorPace5k = await db.RegistrosCardio
+            .Where(r => r.PersonagemId == p.Id && r.Data >= inicio90 && r.FaixaKm >= 5)
+            .MinAsync(r => (int?)r.PaceSegKm);
+        if (melhorPace5k is not null)
+        {
+            var km30 = await db.RegistrosCardio
+                .Where(r => r.PersonagemId == p.Id && r.Data >= inicio30)
+                .SumAsync(r => r.DistanciaKm);
+            resistencia = FormulasCorpo.ResistenciaDe(melhorPace5k.Value, km30);
+        }
+
         var valores = new Dictionary<string, int>
         {
-            ["forca"] = PctConsistencia30("treinar"),
-            ["resistencia"] = PctConsistencia30("treinar"),
+            ["forca"] = forca,
+            ["resistencia"] = resistencia,
+            // Com perfil corporal, o checklist da missão vira as metas calculadas — a adesão já é "real"
             ["vitalidade"] = PctConsistencia30("alimentacao"),
             ["recuperacao"] = PctConsistencia30("dormir"),
             ["inteligencia"] = inteligencia,

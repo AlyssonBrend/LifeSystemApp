@@ -14,6 +14,14 @@ public record ItemLojaReq(string Nome, int Preco);
 public record FocoIniciarReq(string Tipo); // "foco" | "descanso"
 public record FocoEncerrarReq(bool Abandonar);
 
+// ---------- Ações da Fase 2 — Corpo ----------
+public record PerfilReq(double PesoKg, int AlturaCm, int Idade, string Sexo, string Atividade, string Objetivo);
+public record CargaReq(string ExercicioId, double CargaKg, int Reps);
+public record CardioReq(double DistanciaKm, double DuracaoMin);
+public record AmigoReq(string Codigo);
+public record ResponderAmizadeReq(bool Aceitar);
+public record RankingOptInReq(bool OptIn);
+
 // ---------- Estado ----------
 public record PersonagemDto(
     string Nome, int Level, int XpAtual, int XpProximoLevel, long XpTotal,
@@ -55,7 +63,42 @@ public record EstadoDto(
     FocoDto? FocoAtivo,
     DateTime AgoraServidor);
 
+// ---------- Estado da Fase 2 — Corpo ----------
+
+public record PerfilCorporalDto(double PesoKg, int AlturaCm, int Idade, string Sexo, string Atividade, string Objetivo);
+
+public record MetasDto(int Calorias, int ProteinaG, int GorduraG, int CarboG, int FibrasG, int AguaMl);
+
+public record RefeicaoDto(string Nome, int Kcal, string Sugestao);
+
+public record ExercicioDto(
+    string Id, string Nome, string Emoji, string Grupo, bool Basico,
+    double? MelhorRm1, string? MelhorMarca, string? MelhorEm);
+
+public record RegistroCargaDto(int Id, string ExercicioId, double CargaKg, int Reps, double Rm1, bool Pr, string Data);
+
+public record FichaDiaDto(string Nome, string[] Exercicios);
+
+public record FichaDto(string Id, string Nome, string Objetivo, string Frequencia, List<FichaDiaDto> Dias);
+
+public record FaixaCardioDto(int FaixaKm, int? MelhorPaceSegKm, string? MelhorEm);
+
+public record RegistroCardioDto(int Id, double DistanciaKm, double DuracaoMin, int PaceSegKm, int? FaixaKm, bool Pr, string Data);
+
+public record AmigoDto(int AmizadeId, string Nome, string Situacao); // pendenteEnviado | pendenteRecebido | aceita
+
+public record RankingEntradaDto(string Nome, double Valor, double? Relativo, bool EhVoce);
+
+public record RankingDto(string Chave, string Titulo, List<RankingEntradaDto> Amigos, List<RankingEntradaDto> Geral);
+
+public record CorpoDto(
+    PerfilCorporalDto? Perfil, MetasDto? Metas, List<RefeicaoDto> Plano,
+    List<ExercicioDto> Exercicios, List<RegistroCargaDto> Cargas, List<FichaDto> Fichas,
+    List<FaixaCardioDto> FaixasCardio, List<RegistroCardioDto> Cardios, double KmMes,
+    List<string> Conselhos, string CodigoAmigo, bool RankingOptIn, bool AvisoSaudeAceito,
+    List<AmigoDto> Amigos, List<RankingDto> RankingsForca, List<RankingDto> RankingsCardio);
+
 // Eventos disparados por uma ação (o frontend usa para animações/toasts)
 public record EventoDto(string Tipo, string? Titulo = null, int? Level = null, string? Nome = null, string? Emoji = null, string? Recompensa = null);
 
-public record AcaoResp(EstadoDto Estado, List<EventoDto> Eventos);
+public record AcaoResp(EstadoDto Estado, List<EventoDto> Eventos, CorpoDto? Corpo = null);
