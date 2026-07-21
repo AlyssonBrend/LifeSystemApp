@@ -163,9 +163,6 @@ api.MapPost("/classe", (ClasseReq req, ClaimsPrincipal u, JogoService j, AppDb d
 api.MapPost("/chefe/recompensa", (RecompensaReq req, ClaimsPrincipal u, JogoService j, AppDb db) =>
     ComAcao(u, j, db, p => j.DefinirRecompensaCaixa(p, req.Texto)));
 
-api.MapPut("/economias", (EconomiasReq req, ClaimsPrincipal u, JogoService j, AppDb db) =>
-    ComAcao(u, j, db, p => j.DefinirEconomias(p, req.Valor)));
-
 api.MapPost("/loja/itens", (ItemLojaReq req, ClaimsPrincipal u, JogoService j, AppDb db) =>
     ComAcao(u, j, db, p => j.AdicionarItemLoja(p, req.Nome, req.Preco)));
 

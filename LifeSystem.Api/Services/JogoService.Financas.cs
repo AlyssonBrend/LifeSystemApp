@@ -85,19 +85,22 @@ public partial class JogoService
         return eventos;
     }
 
-    /// <summary>Soma dos aportes positivos no mês corrente (o banco e os desta requisição).</summary>
+    /// <summary>
+    /// Poupança líquida do mês corrente: aportes − retiradas, nunca negativa (banco + esta requisição).
+    /// Anti-farm: contar só os positivos permitia inflar a taxa de poupança depositando e retirando em ciclo.
+    /// </summary>
     private async Task<decimal> AportesDoMes(Personagem p, DateOnly hoje)
     {
         var inicioMes = new DateOnly(hoje.Year, hoje.Month, 1);
         // SQLite não agrega decimal no servidor — soma no cliente (poucas linhas por mês)
         var noBanco = (await db.Aportes
-            .Where(a => a.PersonagemId == p.Id && a.Data >= inicioMes && a.Valor > 0)
+            .Where(a => a.PersonagemId == p.Id && a.Data >= inicioMes)
             .Select(a => a.Valor)
             .ToListAsync()).Sum();
         var local = db.Aportes.Local
-            .Where(a => a.PersonagemId == p.Id && a.Data >= inicioMes && a.Valor > 0 && a.Id == 0)
+            .Where(a => a.PersonagemId == p.Id && a.Data >= inicioMes && a.Id == 0)
             .Sum(a => a.Valor);
-        return noBanco + local;
+        return Math.Max(0, noBanco + local);
     }
 
     // ---------- Dívidas (método avalanche, PRD 4.1) ----------
@@ -127,11 +130,30 @@ public partial class JogoService
         var eventos = new List<EventoDto>();
         if (divida.ValorAtual == 0)
         {
-            // Dívida quitada vira um "chefe" derrotado (PRD 4.1) — sem contar em ChefesDerrotados
+            // Dívida quitada vira um "chefe" derrotado (PRD 4.1) — sem contar em ChefesDerrotados.
+            // Anti-farm: máx. 1 quitação premiada por semana (senão dívida de £1 vira loop de XP,
+            // furando o teto anti-inflação do PRD 3.2).
             divida.QuitadaEm = relogio.AgoraUtc;
-            GanharMoedas(p, DividaQuitadaMoedas, $"divida:{divida.Nome}");
-            AplicarXp(p, DividaQuitadaXp, eventos);
-            eventos.Add(new("dividaQuitada", Nome: divida.Nome, Emoji: "⛓️"));
+            var segunda = Formulas.SegundaFeiraDe(relogio.Hoje);
+            var quitacoesPremiadas = await db.Dividas
+                .Where(d => d.PersonagemId == p.Id && d.Premiada && d.QuitadaEm != null)
+                .Select(d => d.QuitadaEm!.Value)
+                .ToListAsync();
+            var jaPremiadaNaSemana = quitacoesPremiadas.Any(q => relogio.DataDe(q) >= segunda);
+
+            if (!jaPremiadaNaSemana)
+            {
+                divida.Premiada = true;
+                GanharMoedas(p, DividaQuitadaMoedas, $"divida:{divida.Nome}");
+                AplicarXp(p, DividaQuitadaXp, eventos);
+                eventos.Add(new("dividaQuitada", Nome: divida.Nome, Emoji: "⛓️",
+                    Titulo: $"Um chefe a menos no bolso: +{DividaQuitadaXp:#,0} XP · +{DividaQuitadaMoedas} 🪙"));
+            }
+            else
+            {
+                eventos.Add(new("dividaQuitada", Nome: divida.Nome, Emoji: "⛓️",
+                    Titulo: "Corrente quebrada! (prêmio já usado esta semana — máx. 1 quitação premiada/semana)"));
+            }
             eventos.AddRange(await ChecarConquistasFinancas(p));
         }
         return eventos;

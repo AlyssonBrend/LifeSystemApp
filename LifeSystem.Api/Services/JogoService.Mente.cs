@@ -89,9 +89,29 @@ public partial class JogoService
 
         livro.ConcluidoEm = relogio.AgoraUtc;
         var eventos = new List<EventoDto>();
-        GanharMoedas(p, LivroMoedas, $"livro:{livro.Id}");
-        AplicarXp(p, LivroXp, eventos);
-        eventos.Add(new("livroConcluido", Nome: livro.Titulo, Emoji: "📕"));
+
+        // Anti-farm: máx. 1 livro premiado por semana (auto-relato ilimitado viraria fonte de XP);
+        // o livro sempre conta para o 📚 Conhecimento — só o prêmio é limitado.
+        var segunda = Formulas.SegundaFeiraDe(relogio.Hoje);
+        var premiados = await db.Livros
+            .Where(l => l.PersonagemId == p.Id && l.Premiado && l.ConcluidoEm != null && l.Id != livro.Id)
+            .Select(l => l.ConcluidoEm!.Value)
+            .ToListAsync();
+        var jaPremiadoNaSemana = premiados.Any(c => relogio.DataDe(c) >= segunda);
+
+        if (!jaPremiadoNaSemana)
+        {
+            livro.Premiado = true;
+            GanharMoedas(p, LivroMoedas, $"livro:{livro.Id}");
+            AplicarXp(p, LivroXp, eventos);
+            eventos.Add(new("livroConcluido", Nome: livro.Titulo, Emoji: "📕",
+                Titulo: $"+{LivroXp} XP · +{LivroMoedas} 🪙 — o Conhecimento agradece"));
+        }
+        else
+        {
+            eventos.Add(new("livroConcluido", Nome: livro.Titulo, Emoji: "📕",
+                Titulo: "Conta para o Conhecimento! (prêmio já usado esta semana — máx. 1 livro premiado/semana)"));
+        }
         eventos.AddRange(await ChecarConquistasMente(p));
         return eventos;
     }

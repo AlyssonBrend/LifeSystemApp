@@ -191,6 +191,7 @@ public class Divida
     public decimal ValorAtual { get; set; }
     public double JurosPctMes { get; set; }
     public DateTime? QuitadaEm { get; set; }
+    public bool Premiada { get; set; }           // anti-farm: máx. 1 quitação premiada por semana
     public DateTime CriadaEm { get; set; } = DateTime.UtcNow;
 }
 
@@ -233,6 +234,7 @@ public class Livro
     public string Titulo { get; set; } = "";
     public int? HabilidadeId { get; set; }
     public DateTime? ConcluidoEm { get; set; }
+    public bool Premiado { get; set; }           // anti-farm: máx. 1 livro premiado por semana
     public DateTime CriadoEm { get; set; } = DateTime.UtcNow;
 }
 

@@ -221,8 +221,6 @@ export const jogo = {
     requisicao<AcaoResp>('/api/jogo/classe', { method: 'POST', body: JSON.stringify({ classe }) }),
   definirRecompensa: (texto: string) =>
     requisicao<AcaoResp>('/api/jogo/chefe/recompensa', { method: 'POST', body: JSON.stringify({ texto }) }),
-  definirEconomias: (valor: number) =>
-    requisicao<AcaoResp>('/api/jogo/economias', { method: 'PUT', body: JSON.stringify({ valor }) }),
   adicionarItemLoja: (nome: string, preco: number) =>
     requisicao<AcaoResp>('/api/jogo/loja/itens', { method: 'POST', body: JSON.stringify({ nome, preco }) }),
   comprarItem: (itemId: number) =>

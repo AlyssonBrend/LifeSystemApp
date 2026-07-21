@@ -9,7 +9,6 @@ public record AuthResp(string Token, string Email, string NomePersonagem);
 public record CheckReq(int Indice, bool Marcado);
 public record ClasseReq(string Classe);
 public record RecompensaReq(string Texto);
-public record EconomiasReq(decimal Valor);
 public record ItemLojaReq(string Nome, int Preco);
 public record FocoIniciarReq(string Tipo, int? HabilidadeId = null); // "foco" | "descanso" · Fase 3: crédito por habilidade
 public record FocoEncerrarReq(bool Abandonar);

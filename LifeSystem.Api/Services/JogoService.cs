@@ -675,11 +675,8 @@ public partial class JogoService(AppDb db, IRelogio relogio, IClienteIa ia)
         return Task.FromResult(new List<EventoDto>());
     }
 
-    public async Task<List<EventoDto>> DefinirEconomias(Personagem p, decimal valor)
-    {
-        p.Economias = Math.Max(0, valor);
-        return await ChecarConquistas(p);
-    }
+    // As economias mudam só via aportes (Fase 3, JogoService.Financas.cs) — não há mais setter direto,
+    // que burlava a conquista dos £10.000 e o diagnóstico de saúde financeira.
 
     // ---------- Criação de personagem ----------
 

@@ -179,6 +179,54 @@ public class FinancasTests : JogoServiceTestBase
         // avalanche: dívidas ordenadas por juros (cartão primeiro)
         Assert.Equal("Cartão", financas.Dividas[0].Nome);
     }
+
+    [Fact] // anti-farm: só 1 quitação premiada por semana; a semana seguinte reabilita
+    public async Task DividaQuitada_PremiaUmaVezPorSemana()
+    {
+        var xpAntes = P.XpTotal;
+
+        await Jogo.CriarDivida(P, "Dívida 1", 1, 5);
+        await Db.SaveChangesAsync();
+        var d1 = await Db.Dividas.SingleAsync(d => d.Nome == "Dívida 1");
+        await Jogo.PagarDivida(P, d1.Id, 1);
+        await Db.SaveChangesAsync();
+        Assert.Equal(xpAntes + 1000, P.XpTotal);
+
+        // segunda quitação na mesma semana: quita, mas não paga XP (evita loop de dívida de £1)
+        await Jogo.CriarDivida(P, "Dívida 2", 1, 5);
+        await Db.SaveChangesAsync();
+        var d2 = await Db.Dividas.SingleAsync(d => d.Nome == "Dívida 2");
+        var eventos = await Jogo.PagarDivida(P, d2.Id, 1);
+        await Db.SaveChangesAsync();
+        Assert.Contains(eventos, e => e.Tipo == "dividaQuitada");
+        Assert.Equal(xpAntes + 1000, P.XpTotal);   // sem novo prêmio
+        Assert.NotNull(d2.QuitadaEm);               // mas a dívida está quitada de fato
+
+        // virar a semana reabilita o prêmio
+        Relogio.AvancarDias(7);
+        await Jogo.CriarDivida(P, "Dívida 3", 1, 5);
+        await Db.SaveChangesAsync();
+        var d3 = await Db.Dividas.SingleAsync(d => d.Nome == "Dívida 3");
+        await Jogo.PagarDivida(P, d3.Id, 1);
+        await Db.SaveChangesAsync();
+        Assert.Equal(xpAntes + 2000, P.XpTotal);
+    }
+
+    [Fact] // anti-farm: taxa de poupança usa o líquido (aportes − retiradas), não só os positivos
+    public async Task TaxaPoupanca_UsaOLiquidoDoMes()
+    {
+        await DefinirPerfil(renda: 3000); // meta = 20% = 600
+        await Jogo.RegistrarAporte(P, 600);
+        await Db.SaveChangesAsync();
+
+        // deposita e retira em ciclo não infla a poupança: £600 − £600 = £0 líquido
+        await Jogo.RegistrarAporte(P, -600);
+        await Db.SaveChangesAsync();
+
+        var financas = await Jogo.MontarFinancas(P);
+        Assert.Equal(0, financas.AportesDoMes);
+        Assert.Equal(0, financas.Diagnostico!.TaxaPoupancaPct);
+    }
 }
 
 public class MenteTests : JogoServiceTestBase
@@ -281,5 +329,38 @@ public class MenteTests : JogoServiceTestBase
 
         var estado = await Jogo.MontarEstado(P);
         Assert.Equal(50, estado.Atributos.First(a => a.Id == "carisma").Valor); // 15/30 dias
+    }
+
+    [Fact] // anti-farm: só 1 livro premiado por semana, mas todo livro conta para o Conhecimento
+    public async Task Livro_PremiaUmaVezPorSemanaMasSempreContaNoConhecimento()
+    {
+        var xpAntes = P.XpTotal;
+        await Jogo.CriarLivro(P, "Livro 1", null);
+        await Jogo.CriarLivro(P, "Livro 2", null);
+        await Db.SaveChangesAsync();
+        var ids = await Db.Livros.OrderBy(l => l.Id).Select(l => l.Id).ToListAsync();
+
+        await Jogo.ConcluirLivro(P, ids[0]);
+        await Db.SaveChangesAsync();
+        Assert.Equal(xpAntes + 100, P.XpTotal);
+
+        // segundo livro na mesma semana: conclui e conta, mas não paga XP
+        var eventos = await Jogo.ConcluirLivro(P, ids[1]);
+        await Db.SaveChangesAsync();
+        Assert.Contains(eventos, e => e.Tipo == "livroConcluido");
+        Assert.Equal(xpAntes + 100, P.XpTotal); // sem novo prêmio
+
+        // ambos alimentam o Conhecimento (2 livros × 4 pts = 8)
+        var estado = await Jogo.MontarEstado(P);
+        Assert.Equal(8, estado.Atributos.First(a => a.Id == "conhecimento").Valor);
+
+        // virar a semana reabilita o prêmio
+        Relogio.AvancarDias(7);
+        await Jogo.CriarLivro(P, "Livro 3", null);
+        await Db.SaveChangesAsync();
+        var id3 = await Db.Livros.OrderByDescending(l => l.Id).Select(l => l.Id).FirstAsync();
+        await Jogo.ConcluirLivro(P, id3);
+        await Db.SaveChangesAsync();
+        Assert.Equal(xpAntes + 200, P.XpTotal);
     }
 }
