@@ -176,22 +176,56 @@ public partial class JogoService
             throw new InvalidOperationException(
                 $"Conversão passaria do orçamento do mês (£{perfil.OrcamentoRecompensa - convertidoMes:0.##} restantes)");
 
+        // Converter abastece o Saldo de Recompensa (£): dinheiro liberado para gastar sem culpa (PRD 3.8).
         p.Moedas -= moedas;
+        p.SaldoRecompensa += libras;
         db.TransacoesMoedas.Add(new TransacaoMoedas
         {
             PersonagemId = p.Id, Tipo = "conversao", Valor = moedas, Origem = "conversao",
             CriadoEm = relogio.AgoraUtc,
         });
-        return [new("conversao", Titulo: $"£{libras:0.##} liberadas para gastar sem culpa")];
+        return [new("conversao", Titulo: $"£{libras:0.##} liberadas — agora estão no seu Saldo de Recompensa")];
     }
 
-    /// <summary>Libras já convertidas no mês corrente (teto = orçamento de recompensa, PRD 3.8).</summary>
+    /// <summary>
+    /// Gasta do Saldo de Recompensa quando o jogador resgata algo que custa dinheiro real (PRD 3.8) —
+    /// fecha o ciclo: converter acumula, gastar consome.
+    /// </summary>
+    public Task<List<EventoDto>> RegistrarGastoRecompensa(Personagem p, decimal valor, string descricao)
+    {
+        if (valor <= 0 || valor > 1_000_000) throw new ArgumentException("Valor do gasto inválido");
+        if (valor > p.SaldoRecompensa)
+            throw new InvalidOperationException(
+                $"Saldo de Recompensa insuficiente (£{p.SaldoRecompensa:0.##}) — converta mais moedas primeiro");
+
+        p.SaldoRecompensa -= valor;
+        var texto = string.IsNullOrWhiteSpace(descricao) ? "gasto sem culpa" : descricao.Trim();
+        db.TransacoesMoedas.Add(new TransacaoMoedas
+        {
+            PersonagemId = p.Id, Tipo = "gastoRecompensa", Valor = (int)Math.Round(valor),
+            Origem = $"recompensa:{texto}", CriadoEm = relogio.AgoraUtc,
+        });
+        return Task.FromResult(new List<EventoDto>
+        {
+            new("gastoRecompensa", Nome: texto, Titulo: $"£{valor:0.##} gastos sem culpa — você conquistou isso 🎁"),
+        });
+    }
+
+    /// <summary>
+    /// Libras já convertidas no mês corrente do jogador (teto = orçamento de recompensa, PRD 3.8).
+    /// Usa o fuso do jogador (relogio.DataDe), não UTC — consistente com os aportes.
+    /// </summary>
     private async Task<decimal> ConvertidoNoMes(Personagem p, DateOnly hoje)
     {
-        var inicioMesUtc = new DateTime(hoje.Year, hoje.Month, 1, 0, 0, 0, DateTimeKind.Utc);
-        var moedas = await db.TransacoesMoedas
-            .Where(t => t.PersonagemId == p.Id && t.Tipo == "conversao" && t.CriadoEm >= inicioMesUtc)
-            .SumAsync(t => t.Valor);
+        var inicioMes = new DateOnly(hoje.Year, hoje.Month, 1);
+        // TransacaoMoedas guarda só CriadoEm (UTC); converte para a data do jogador no cliente
+        var transacoes = await db.TransacoesMoedas
+            .Where(t => t.PersonagemId == p.Id && t.Tipo == "conversao")
+            .Select(t => new { t.Valor, t.CriadoEm })
+            .ToListAsync();
+        var moedas = transacoes
+            .Where(t => relogio.DataDe(t.CriadoEm) >= inicioMes)
+            .Sum(t => t.Valor);
         return (decimal)moedas / FormulasFinancas.MoedasPorLibra;
     }
 
@@ -253,9 +287,6 @@ public partial class JogoService
             .Take(12).ToListAsync();
 
         var convertidoMes = await ConvertidoNoMes(p, hoje);
-        var liberadoTotal = (decimal)await db.TransacoesMoedas
-            .Where(t => t.PersonagemId == p.Id && t.Tipo == "conversao")
-            .SumAsync(t => t.Valor) / FormulasFinancas.MoedasPorLibra;
 
         var metaBatida = perfil is not null && perfil.RendaMensal > 0
             && aportesDoMes >= perfil.RendaMensal * (decimal)(FormulasFinancas.MetaPoupancaPct / 100);
@@ -269,7 +300,7 @@ public partial class JogoService
             dividas.Select(d => new DividaDto(d.Id, d.Nome, d.ValorAtual, d.JurosPctMes, d.QuitadaEm != null)).ToList(),
             aportes.Select(a => new AporteDto(a.Id, a.Valor, a.Data.ToString("yyyy-MM-dd"))).ToList(),
             aportesDoMes,
-            new ConversaoDto(convertidoMes, perfil?.OrcamentoRecompensa ?? 0, liberadoTotal),
+            new ConversaoDto(convertidoMes, perfil?.OrcamentoRecompensa ?? 0, p.SaldoRecompensa),
             MontarConselhosFinancas(p, diag, dividas, aportesDoMes),
             p.AvisoFinancasAceitoEm is not null);
     }

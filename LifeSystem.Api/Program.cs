@@ -283,6 +283,9 @@ financas.MapPost("/dividas/{dividaId:int}/pagar", (int dividaId, PagarDividaReq 
 financas.MapPost("/converter", (ConverterReq req, ClaimsPrincipal u, JogoService j, AppDb db) =>
     ComFinancas(u, j, db, p => j.ConverterMoedas(p, req.Moedas)));
 
+financas.MapPost("/gastar", (GastoRecompensaReq req, ClaimsPrincipal u, JogoService j, AppDb db) =>
+    ComFinancas(u, j, db, p => j.RegistrarGastoRecompensa(p, req.Valor, req.Descricao)));
+
 var mente = api.MapGroup("/mente");
 
 mente.MapGet("", (ClaimsPrincipal u, JogoService j, AppDb db) =>

@@ -27,13 +27,15 @@ public record AporteReq(decimal Valor);
 public record DividaReq(string Nome, decimal Valor, double JurosPctMes);
 public record PagarDividaReq(decimal Valor);
 public record ConverterReq(int Moedas);
+public record GastoRecompensaReq(decimal Valor, string Descricao); // consome o Saldo de Recompensa (PRD 3.8)
 public record HabilidadeReq(string? TrilhaId, string? Nome); // trilha do catálogo OU nome personalizado
 public record LivroReq(string Titulo, int? HabilidadeId);
 
 // ---------- Estado ----------
 public record PersonagemDto(
     string Nome, int Level, int XpAtual, int XpProximoLevel, long XpTotal,
-    int Moedas, decimal Economias, int StreakDias, int ProtecoesStreak, double MultiplicadorStreak,
+    int Moedas, int TetoMoedas, decimal Economias, decimal SaldoRecompensa,
+    int StreakDias, int ProtecoesStreak, double MultiplicadorStreak,
     string? Classe, string Titulo, string EmojiTitulo,
     int Hp, int Energia, int DiasPerfeitos, int ChefesDerrotados,
     bool PodeEscolherClasse, bool BonusClasseAtivo, bool AvatarTranscendente);
@@ -119,7 +121,7 @@ public record DividaDto(int Id, string Nome, decimal ValorAtual, double JurosPct
 
 public record AporteDto(int Id, decimal Valor, string Data);
 
-public record ConversaoDto(decimal ConvertidoMesLibras, decimal TetoMesLibras, decimal LiberadoTotalLibras);
+public record ConversaoDto(decimal ConvertidoMesLibras, decimal TetoMesLibras, decimal SaldoRecompensa);
 
 public record FinancasDto(
     PerfilFinanceiroDto? Perfil, DiagnosticoDto? Diagnostico,

@@ -96,10 +96,13 @@ function GameView({ onSair }: { onSair: () => void }) {
           toast.success('🐷 META DE POUPANÇA DO MÊS BATIDA!', { description: '+300 XP · +30 🪙 — missão mensal cumprida', duration: 6000 })
           break
         case 'dividaQuitada':
-          toast.success(`⛓️ DÍVIDA QUITADA — ${ev.nome}`, { description: 'Um chefe a menos no bolso: +1.000 XP · +200 🪙', duration: 8000 })
+          toast.success(`⛓️ DÍVIDA QUITADA — ${ev.nome}`, { description: ev.titulo, duration: 8000 })
           break
         case 'conversao':
           toast.success('💷 Moedas convertidas!', { description: ev.titulo })
+          break
+        case 'gastoRecompensa':
+          toast.success(`🎁 ${ev.nome}`, { description: ev.titulo })
           break
         case 'marco':
           toast.success(`🌳 Marco concluído — ${ev.nome}`, { description: `${ev.titulo} · +50 XP · +5 🪙` })
@@ -182,8 +185,14 @@ function GameView({ onSair }: { onSair: () => void }) {
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-sm">
             <span title="Reflexo de Vitalidade/Recuperação">HP <span className="text-red-400">{p.hp}%</span></span>
             <span title="Qualidade do sono da última noite">⚡ <span className="text-cyan-400">{p.energia}%</span></span>
-            <span data-testid="header-moedas">🪙 <span className="text-amber-400">{fmt(p.moedas)}</span></span>
-            <span>💰 <span className="text-amber-300">£{fmt(p.economias)}</span></span>
+            <span data-testid="header-moedas" title={p.moedas >= p.tetoMoedas ? 'Cofre cheio — gaste na Loja ou converta' : 'Moedas do jogo'}>
+              🪙 <span className={p.moedas >= p.tetoMoedas ? 'text-red-400' : 'text-amber-400'}>{fmt(p.moedas)}</span>
+              {p.moedas >= p.tetoMoedas && <span className="ml-1 text-[10px] uppercase text-red-400">cheio</span>}
+            </span>
+            {p.saldoRecompensa > 0 && (
+              <span title="Saldo de Recompensa — dinheiro liberado para gastar sem culpa">🎁 <span className="text-amber-300">£{fmt(p.saldoRecompensa)}</span></span>
+            )}
+            <span title="Patrimônio economizado">💰 <span className="text-amber-300">£{fmt(p.economias)}</span></span>
             <span data-testid="header-streak">🔥 <span className="text-orange-400">{p.streakDias} {p.streakDias === 1 ? 'dia' : 'dias'}</span></span>
             {p.protecoesStreak > 0 && (
               <span title="Proteções de sequência (dia perfeito)">🛡️ <span className="text-cyan-400">×{p.protecoesStreak}</span></span>
@@ -263,6 +272,7 @@ function GameView({ onSair }: { onSair: () => void }) {
               onDivida={(nome, valor, juros) => despachar(() => jogo.criarDivida(nome, valor, juros))}
               onPagar={(id, valor) => despachar(() => jogo.pagarDivida(id, valor))}
               onConverter={m => despachar(() => jogo.converterMoedas(m))}
+              onGastar={(v, d) => despachar(() => jogo.gastarRecompensa(v, d))}
             />
           </TabsContent>
           <TabsContent value="mentor">

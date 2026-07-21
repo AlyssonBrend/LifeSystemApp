@@ -19,6 +19,9 @@ public partial class JogoService(AppDb db, IRelogio relogio, IClienteIa ia)
     private const int CarenciaTrocaClasseDias = 30;
     private const int DiasParaTranscender = 30;
     private const int PisoTranscendencia = 80; // todos os 10 atributos em Elite (80+)
+    // Teto anti-inflação (PRD seção 9): ~5 meses de ganho consistente. Acima disso o cofre "enche"
+    // e o ganho para de creditar — pressão para gastar na loja ou converter, sem a loja perder sentido.
+    public const int TetoMoedas = 5000;
 
     // ---------- Carregamento e sincronização ----------
 
@@ -241,7 +244,7 @@ public partial class JogoService(AppDb db, IRelogio relogio, IClienteIa ia)
         return new EstadoDto(
             new PersonagemDto(
                 p.Nome, p.Level, p.XpAtual, Formulas.XpParaProximoLevel(p.Level), p.XpTotal,
-                p.Moedas, p.Economias, p.StreakDias, p.ProtecoesStreak, mult,
+                p.Moedas, TetoMoedas, p.Economias, p.SaldoRecompensa, p.StreakDias, p.ProtecoesStreak, mult,
                 p.Classe,
                 Formulas.TituloAtual(p.Level, p.Classe, p.AvatarTranscendente),
                 Formulas.EmojiTitulo(p.Level, p.Classe, p.AvatarTranscendente),
@@ -520,7 +523,9 @@ public partial class JogoService(AppDb db, IRelogio relogio, IClienteIa ia)
 
     private void GanharMoedas(Personagem p, int valor, string origem)
     {
-        p.Moedas += valor;
+        // Teto anti-inflação: credita só até o teto; o excedente não entra no cofre.
+        // A transação registra o valor real (auditoria/estatística), mesmo se cortado.
+        p.Moedas = Math.Min(TetoMoedas, p.Moedas + valor);
         db.TransacoesMoedas.Add(new TransacaoMoedas
         {
             PersonagemId = p.Id, Tipo = "ganho", Valor = valor, Origem = origem,

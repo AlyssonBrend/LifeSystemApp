@@ -17,8 +17,9 @@ public class Personagem
     public int Level { get; set; }               // inicia em 0 (PRD 3.2)
     public int XpAtual { get; set; }             // XP dentro do level atual
     public long XpTotal { get; set; }
-    public int Moedas { get; set; }
-    public decimal Economias { get; set; }
+    public int Moedas { get; set; }               // economia do jogo 🪙; teto anti-inflação em GanharMoedas
+    public decimal Economias { get; set; }        // patrimônio real £ (via aportes, Fase 3)
+    public decimal SaldoRecompensa { get; set; }  // £ liberado para gastar sem culpa (PRD 3.8): converter abastece, gastar consome
     public int StreakDias { get; set; }
     public DateOnly? UltimoDiaComMissao { get; set; }
     public int ProtecoesStreak { get; set; }     // dia perfeito concede +1 (PRD 3.3); cobre dias perdidos

@@ -7,7 +7,8 @@ const BASE = import.meta.env.VITE_API_URL ?? ''
 
 export interface PersonagemDto {
   nome: string; level: number; xpAtual: number; xpProximoLevel: number; xpTotal: number
-  moedas: number; economias: number; streakDias: number; protecoesStreak: number; multiplicadorStreak: number
+  moedas: number; tetoMoedas: number; economias: number; saldoRecompensa: number
+  streakDias: number; protecoesStreak: number; multiplicadorStreak: number
   classe: string | null; titulo: string; emojiTitulo: string
   hp: number; energia: number; diasPerfeitos: number; chefesDerrotados: number
   podeEscolherClasse: boolean; bonusClasseAtivo: boolean; avatarTranscendente: boolean
@@ -103,7 +104,7 @@ export interface DiagnosticoDto {
 
 export interface DividaDto { id: number; nome: string; valorAtual: number; jurosPctMes: number; quitada: boolean }
 export interface AporteDto { id: number; valor: number; data: string }
-export interface ConversaoDto { convertidoMesLibras: number; tetoMesLibras: number; liberadoTotalLibras: number }
+export interface ConversaoDto { convertidoMesLibras: number; tetoMesLibras: number; saldoRecompensa: number }
 
 export interface FinancasDto {
   perfil: PerfilFinanceiroDto | null
@@ -257,6 +258,8 @@ export const jogo = {
     requisicao<AcaoResp>(`/api/jogo/financas/dividas/${dividaId}/pagar`, { method: 'POST', body: JSON.stringify({ valor }) }),
   converterMoedas: (moedas: number) =>
     requisicao<AcaoResp>('/api/jogo/financas/converter', { method: 'POST', body: JSON.stringify({ moedas }) }),
+  gastarRecompensa: (valor: number, descricao: string) =>
+    requisicao<AcaoResp>('/api/jogo/financas/gastar', { method: 'POST', body: JSON.stringify({ valor, descricao }) }),
 
   // ---------- Fase 3 — Mente ----------
   mente: () => requisicao<AcaoResp>('/api/jogo/mente'),

@@ -15,6 +15,7 @@ interface Props {
   onDivida: (nome: string, valor: number, jurosPctMes: number) => void
   onPagar: (dividaId: number, valor: number) => void
   onConverter: (moedas: number) => void
+  onGastar: (valor: number, descricao: string) => void
 }
 
 const CORES_NIVEL: Record<string, string> = {
@@ -302,49 +303,79 @@ function SecaoDividas({ financas, onDivida, onPagar }: Props & { financas: Finan
   )
 }
 
-// ---------- Conversão de moedas (PRD 3.8) ----------
+// ---------- Gastar sem culpa: 🪙 → Saldo de Recompensa £ (PRD 3.8) ----------
 
-function SecaoConversao({ financas, moedas, onConverter }: Props & { financas: FinancasDto }) {
+function SecaoConversao({ financas, moedas, onConverter, onGastar }: Props & { financas: FinancasDto }) {
   const [qtde, setQtde] = useState('')
+  const [gasto, setGasto] = useState('')
+  const [descricao, setDescricao] = useState('')
   const c = financas.conversao
   const temOrcamento = c.tetoMesLibras > 0
   const restante = Math.max(0, c.tetoMesLibras - c.convertidoMesLibras)
+  const saldo = c.saldoRecompensa
 
   return (
     <section className="border border-amber-400/30 bg-card p-4">
-      <h3 className="font-display text-sm uppercase tracking-[0.25em] text-amber-400">Converter moedas → £</h3>
+      <h3 className="font-display text-sm uppercase tracking-[0.25em] text-amber-400">💸 Gastar sem culpa</h3>
       <p className="mt-2 text-sm text-muted-foreground">
-        10 🪙 = £1. As moedas liberam o <strong>seu próprio</strong> orçamento de recompensa — dinheiro para
-        gastar sem culpa, conquistado com disciplina.
+        Suas <strong>🪙 moedas</strong> são a economia do jogo (ganhas com disciplina). Convertê-las abastece o
+        seu <strong>Saldo de Recompensa (£)</strong> — dinheiro do seu próprio orçamento, liberado para gastar
+        sem culpa. Quando comprar a recompensa, registre o gasto e o saldo abaixa.
       </p>
 
       {temOrcamento ? (
         <>
-          <div className="mt-3">
+          {/* Saldo de Recompensa em destaque */}
+          <div className="mt-3 border border-amber-400/40 bg-secondary/40 px-3 py-3 text-center">
+            <p className="text-xs uppercase tracking-wider text-muted-foreground">Saldo de Recompensa</p>
+            <p className="font-mono text-3xl font-bold text-amber-400" data-testid="saldo-recompensa">£{fmt(saldo)}</p>
+            <p className="text-xs text-muted-foreground">liberado para gastar sem culpa</p>
+          </div>
+
+          {/* 1) Converter moedas → saldo */}
+          <div className="mt-4">
             <div className="flex justify-between font-mono text-xs text-muted-foreground">
-              <span>convertido no mês</span>
+              <span>① Converter 🪙 → £ · teto do mês</span>
               <span>£{fmt(c.convertidoMesLibras)}/£{fmt(c.tetoMesLibras)}</span>
             </div>
             <div className="mt-1 h-2 w-full bg-secondary">
               <div className="h-full bg-gradient-to-r from-amber-500 to-amber-300 transition-all" style={{ width: `${Math.min(100, (c.convertidoMesLibras / c.tetoMesLibras) * 100)}%` }} />
             </div>
+            <form
+              className="mt-2 flex gap-2"
+              onSubmit={e => {
+                e.preventDefault()
+                const m = Math.floor(Number(qtde))
+                if (m >= 10) { onConverter(m - (m % 10)); setQtde('') }
+              }}
+            >
+              <Input value={qtde} onChange={e => setQtde(e.target.value)} placeholder={`moedas (você tem ${fmt(moedas)}) · 10🪙 = £1`} aria-label="Moedas a converter" inputMode="numeric" className="font-mono" />
+              <Button type="submit" className="font-display uppercase tracking-widest" disabled={restante <= 0}>
+                Converter
+              </Button>
+            </form>
+            <p className="mt-1 font-mono text-xs text-muted-foreground">restam £{fmt(restante)} no teto deste mês</p>
           </div>
+
+          {/* 2) Gastar do saldo */}
           <form
-            className="mt-3 flex gap-2"
+            className="mt-4"
             onSubmit={e => {
               e.preventDefault()
-              const m = Math.floor(Number(qtde))
-              if (m >= 10) { onConverter(m - (m % 10)); setQtde('') }
+              const v = Number(gasto.replace(',', '.'))
+              if (v > 0 && v <= saldo) { onGastar(v, descricao.trim()); setGasto(''); setDescricao('') }
             }}
           >
-            <Input value={qtde} onChange={e => setQtde(e.target.value)} placeholder={`moedas (você tem ${fmt(moedas)})`} aria-label="Moedas a converter" inputMode="numeric" className="font-mono" />
-            <Button type="submit" className="font-display uppercase tracking-widest" disabled={restante <= 0}>
-              Converter
-            </Button>
+            <p className="mb-1 font-mono text-xs text-muted-foreground">② Resgatei uma recompensa (abate do saldo):</p>
+            <div className="flex flex-wrap gap-2">
+              <Input value={descricao} onChange={e => setDescricao(e.target.value)} placeholder="o que resgatou (ex.: Jantar fora)" aria-label="Descrição do gasto" className="min-w-40 flex-1" />
+              <Input value={gasto} onChange={e => setGasto(e.target.value)} placeholder="£" aria-label="Valor gasto" inputMode="decimal" className="w-24 font-mono" />
+              <Button type="submit" variant="secondary" className="font-display uppercase tracking-widest" disabled={saldo <= 0}>
+                🎁 Gastar
+              </Button>
+            </div>
+            {saldo <= 0 && <p className="mt-1 text-xs text-muted-foreground">Converta moedas primeiro para ter saldo.</p>}
           </form>
-          <p className="mt-2 font-mono text-xs text-muted-foreground">
-            💷 Liberado no total: £{fmt(c.liberadoTotalLibras)} · restam £{fmt(restante)} no teto do mês
-          </p>
         </>
       ) : (
         <p className="mt-3 border border-border bg-secondary/40 px-3 py-2 text-sm text-muted-foreground">

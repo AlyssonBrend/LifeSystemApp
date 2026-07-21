@@ -115,6 +115,7 @@ public class FinancasTests : JogoServiceTestBase
         await Db.SaveChangesAsync();
         Assert.Contains(eventos, e => e.Tipo == "conversao");
         Assert.Equal(1400, P.Moedas);
+        Assert.Equal(60, P.SaldoRecompensa);   // converter abastece o Saldo de Recompensa
         Assert.Equal("conversao", (await Db.TransacoesMoedas.SingleAsync(t => t.Tipo == "conversao")).Origem);
 
         // £60 + £50 passariam do orçamento de £100
@@ -124,10 +125,11 @@ public class FinancasTests : JogoServiceTestBase
         await Jogo.ConverterMoedas(P, 400);
         await Db.SaveChangesAsync();
         Assert.Equal(1000, P.Moedas);
+        Assert.Equal(100, P.SaldoRecompensa);
 
         var financas = await Jogo.MontarFinancas(P);
         Assert.Equal(100, financas.Conversao.ConvertidoMesLibras);
-        Assert.Equal(100, financas.Conversao.LiberadoTotalLibras);
+        Assert.Equal(100, financas.Conversao.SaldoRecompensa);
     }
 
     [Fact] // dívida quitada vira "chefe" derrotado (PRD 4.1) — sem contar em ChefesDerrotados
@@ -226,6 +228,66 @@ public class FinancasTests : JogoServiceTestBase
         var financas = await Jogo.MontarFinancas(P);
         Assert.Equal(0, financas.AportesDoMes);
         Assert.Equal(0, financas.Diagnostico!.TaxaPoupancaPct);
+    }
+
+    [Fact] // Saldo de Recompensa: converter abastece, gastar consome; não fica negativo (PRD 3.8)
+    public async Task SaldoRecompensa_ConverteAbasteceEGastarConsome()
+    {
+        await DefinirPerfil(orcamento: 100);
+        P.Moedas = 1000;
+        await Db.SaveChangesAsync();
+
+        await Jogo.ConverterMoedas(P, 500); // £50 no saldo
+        await Db.SaveChangesAsync();
+        Assert.Equal(50, P.SaldoRecompensa);
+
+        var eventos = await Jogo.RegistrarGastoRecompensa(P, 30, "Jantar fora");
+        await Db.SaveChangesAsync();
+        Assert.Contains(eventos, e => e.Tipo == "gastoRecompensa" && e.Nome == "Jantar fora");
+        Assert.Equal(20, P.SaldoRecompensa);
+        Assert.Equal("gastoRecompensa", (await Db.TransacoesMoedas.SingleAsync(t => t.Tipo == "gastoRecompensa")).Tipo);
+
+        // gastar mais que o saldo falha, sem deixar negativo
+        await Assert.ThrowsAsync<InvalidOperationException>(() => Jogo.RegistrarGastoRecompensa(P, 50, "Wishlist"));
+        Assert.Equal(20, P.SaldoRecompensa);
+    }
+
+    [Fact] // teto mensal da conversão usa o fuso do jogador, não UTC (bug na virada do mês)
+    public async Task ConversaoTetoMensal_UsaOFusoDoJogador()
+    {
+        await DefinirPerfil(orcamento: 10);
+        P.Moedas = 500;
+        await Db.SaveChangesAsync();
+
+        // 01/08 às 01:00 UTC = 31/07 às 22:00 no fuso BRT (UTC-3): ainda é JULHO para o jogador
+        Relogio.AgoraUtc = new DateTime(2026, 8, 1, 1, 0, 0, DateTimeKind.Utc);
+        await Jogo.ConverterMoedas(P, 100); // £10 — fecha o teto de julho
+        await Db.SaveChangesAsync();
+        await Assert.ThrowsAsync<InvalidOperationException>(() => Jogo.ConverterMoedas(P, 10)); // julho cheio
+
+        // avança 3h → 01/08 às 04:00 UTC = 01/08 às 01:00 BRT: agora é AGOSTO, teto reabre
+        Relogio.AgoraUtc = new DateTime(2026, 8, 1, 4, 0, 0, DateTimeKind.Utc);
+        await Jogo.ConverterMoedas(P, 100); // £10 em agosto, ok
+        await Db.SaveChangesAsync();
+        Assert.Equal(300, P.Moedas);
+        Assert.Equal(20, P.SaldoRecompensa);
+    }
+
+    [Fact] // teto anti-inflação: o cofre para em TetoMoedas e o ganho excedente não entra
+    public async Task Moedas_ParamNoTetoAntiInflacao()
+    {
+        P.Moedas = Services.JogoService.TetoMoedas - 10;
+        await Db.SaveChangesAsync();
+
+        // uma conquista paga +100 🪙, mas só 10 cabem até o teto
+        await Jogo.DefinirPerfilFinanceiro(P, new Contracts.PerfilFinanceiroReq(3000, 1500, 500, 100));
+        await Jogo.CriarDivida(P, "Cartão", 100, 12);
+        await Db.SaveChangesAsync();
+        var divida = await Db.Dividas.SingleAsync();
+        await Jogo.PagarDivida(P, divida.Id, 100); // +200 🪙 (dívida) + 100 🪙 (conquista dividaZero)
+        await Db.SaveChangesAsync();
+
+        Assert.Equal(Services.JogoService.TetoMoedas, P.Moedas); // travado no teto, não passou
     }
 }
 
