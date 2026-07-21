@@ -1,0 +1,285 @@
+using LifeSystem.Api.Contracts;
+using LifeSystem.Api.Domain;
+using Microsoft.EntityFrameworkCore;
+
+namespace LifeSystem.Api.Tests;
+
+public class FormulasFinancasTests
+{
+    [Theory] // poupar 20% ≈ 50 pts · reserva de 6 meses ≈ 50 pts (PRD 4.1)
+    [InlineData(0, 0, 0)]
+    [InlineData(10, 0, 25)]
+    [InlineData(20, 0, 50)]
+    [InlineData(0, 6, 50)]
+    [InlineData(20, 6, 100)]
+    [InlineData(40, 12, 100)] // ambos os lados saturam
+    public void Score_CombinaPoupancaEReserva(double taxa, double meses, int esperado) =>
+        Assert.Equal(esperado, FormulasFinancas.Score(taxa, meses));
+
+    [Theory] // Nível Financeiro E → S (PRD 4.1)
+    [InlineData(10, "E")]
+    [InlineData(20, "D")]
+    [InlineData(35, "C")]
+    [InlineData(50, "B")]
+    [InlineData(65, "A")]
+    [InlineData(80, "S")]
+    public void Nivel_SegueAsFaixas(int score, string esperado) =>
+        Assert.Equal(esperado, FormulasFinancas.Nivel(score));
+
+    [Fact] // renda 3000, despesas 1500+500, economias 4000, aportes 600 → o exemplo canônico
+    public void Diagnostico_CalculaOsQuatroIndicadores()
+    {
+        var perfil = new PerfilFinanceiro
+        {
+            RendaMensal = 3000, DespesasFixas = 1500, DespesasVariaveis = 500, OrcamentoRecompensa = 100,
+        };
+        var d = FormulasFinancas.Diagnostico(perfil, economias: 4000, aportesDoMes: 600);
+
+        Assert.Equal(2.0, d.MesesReserva);           // 4000 ÷ 2000
+        Assert.Equal(12000, d.ReservaMeta);          // 6 × 2000
+        Assert.Equal(8000, d.ReservaFaltante);
+        Assert.Equal(20, d.TaxaPoupancaPct);         // 600 ÷ 3000
+        Assert.Equal(50, d.PctNecessidades);         // fixas ÷ renda
+        Assert.Equal(30, d.PctDesejos);              // o resto
+        Assert.Equal(67, d.Score);                   // 50 (poupança) + 16,7 (reserva 2/6)
+        Assert.Equal("A", d.Nivel);
+    }
+}
+
+public class FinancasTests : JogoServiceTestBase
+{
+    private Task<List<EventoDto>> DefinirPerfil(decimal renda = 3000, decimal orcamento = 100) =>
+        Jogo.DefinirPerfilFinanceiro(P, new PerfilFinanceiroReq(renda, 1500, 500, orcamento));
+
+    [Fact]
+    public async Task Aporte_SomaNasEconomiasERegistra()
+    {
+        await Jogo.RegistrarAporte(P, 250);
+        await Db.SaveChangesAsync();
+
+        Assert.Equal(250, P.Economias);
+        Assert.Equal(250, (await Db.Aportes.SingleAsync()).Valor);
+    }
+
+    [Fact]
+    public async Task Retirada_NaoDeixaEconomiasNegativas()
+    {
+        await Jogo.RegistrarAporte(P, 100);
+        await Db.SaveChangesAsync();
+        await Assert.ThrowsAsync<InvalidOperationException>(() => Jogo.RegistrarAporte(P, -200));
+    }
+
+    [Fact] // missão mensal (PRD 4.1): +300 XP +30 🪙 uma única vez por mês
+    public async Task MetaDePoupanca_PagaUmaVezPorMes()
+    {
+        await DefinirPerfil(renda: 3000); // meta = 20% = 600
+        await Db.SaveChangesAsync();
+        var xpAntes = P.XpTotal;
+        var moedasAntes = P.Moedas;
+
+        var eventos = await Jogo.RegistrarAporte(P, 600);
+        await Db.SaveChangesAsync();
+        Assert.Contains(eventos, e => e.Tipo == "metaPoupanca");
+        Assert.Equal(xpAntes + 300, P.XpTotal);
+        Assert.Equal(moedasAntes + 30, P.Moedas);
+
+        // mais um aporte no mesmo mês não paga de novo
+        eventos = await Jogo.RegistrarAporte(P, 600);
+        await Db.SaveChangesAsync();
+        Assert.DoesNotContain(eventos, e => e.Tipo == "metaPoupanca");
+        Assert.Equal(xpAntes + 300, P.XpTotal);
+
+        // virar o mês reabilita a missão
+        Relogio.AvancarDias(31);
+        eventos = await Jogo.RegistrarAporte(P, 600);
+        await Db.SaveChangesAsync();
+        Assert.Contains(eventos, e => e.Tipo == "metaPoupanca");
+        Assert.Equal(xpAntes + 600, P.XpTotal);
+    }
+
+    [Fact] // conversão exige orçamento de recompensa definido (PRD 3.8)
+    public async Task Converter_SemOrcamentoFalha()
+    {
+        P.Moedas = 500;
+        await Assert.ThrowsAsync<InvalidOperationException>(() => Jogo.ConverterMoedas(P, 100));
+    }
+
+    [Fact] // 10 🪙 = £1, teto mensal = orçamento; extrato tipo "conversao" (PRD 3.8)
+    public async Task Converter_DebitaMoedasERespeitaOTeto()
+    {
+        await DefinirPerfil(orcamento: 100);
+        P.Moedas = 2000;
+        await Db.SaveChangesAsync();
+
+        var eventos = await Jogo.ConverterMoedas(P, 600); // £60
+        await Db.SaveChangesAsync();
+        Assert.Contains(eventos, e => e.Tipo == "conversao");
+        Assert.Equal(1400, P.Moedas);
+        Assert.Equal("conversao", (await Db.TransacoesMoedas.SingleAsync(t => t.Tipo == "conversao")).Origem);
+
+        // £60 + £50 passariam do orçamento de £100
+        await Assert.ThrowsAsync<InvalidOperationException>(() => Jogo.ConverterMoedas(P, 500));
+
+        // £40 fecham exatamente o teto
+        await Jogo.ConverterMoedas(P, 400);
+        await Db.SaveChangesAsync();
+        Assert.Equal(1000, P.Moedas);
+
+        var financas = await Jogo.MontarFinancas(P);
+        Assert.Equal(100, financas.Conversao.ConvertidoMesLibras);
+        Assert.Equal(100, financas.Conversao.LiberadoTotalLibras);
+    }
+
+    [Fact] // dívida quitada vira "chefe" derrotado (PRD 4.1) — sem contar em ChefesDerrotados
+    public async Task DividaQuitada_PagaComoChefeSemContarNoContador()
+    {
+        await Jogo.CriarDivida(P, "Cartão de crédito", 800, 12);
+        await Db.SaveChangesAsync();
+        var divida = await Db.Dividas.SingleAsync();
+        var xpAntes = P.XpTotal;
+
+        var eventos = await Jogo.PagarDivida(P, divida.Id, 300);
+        Assert.Empty(eventos.Where(e => e.Tipo == "dividaQuitada"));
+        Assert.Equal(500, divida.ValorAtual);
+
+        eventos = await Jogo.PagarDivida(P, divida.Id, 500);
+        await Db.SaveChangesAsync();
+        Assert.Contains(eventos, e => e.Tipo == "dividaQuitada" && e.Nome == "Cartão de crédito");
+        Assert.Contains(eventos, e => e.Tipo == "conquista" && e.Nome == "Corrente quebrada");
+        Assert.Equal(xpAntes + 1000, P.XpTotal);
+        Assert.Equal(0, P.ChefesDerrotados);
+        Assert.NotNull(divida.QuitadaEm);
+    }
+
+    [Fact] // com perfil financeiro, o atributo 💰 vira o score do Nível Financeiro
+    public async Task AtributoFinancas_UsaOScoreQuandoHaPerfil()
+    {
+        var estado = await Jogo.MontarEstado(P);
+        Assert.Equal(0, estado.Atributos.First(a => a.Id == "financas").Valor); // proxy sem dados
+
+        await DefinirPerfil(renda: 3000);
+        await Jogo.RegistrarAporte(P, 600); // 20% → 50 pts do lado da poupança
+        await Db.SaveChangesAsync();
+
+        estado = await Jogo.MontarEstado(P);
+        Assert.True(estado.Atributos.First(a => a.Id == "financas").Valor >= 50);
+    }
+
+    [Fact] // conselhos da tabela 4.1: reserva, 50/30/20 e avalanche
+    public async Task Conselhos_SeguemAsRegrasDaTabela()
+    {
+        await DefinirPerfil();
+        await Jogo.CriarDivida(P, "Cartão", 1000, 12);
+        await Jogo.CriarDivida(P, "Crediário", 2000, 4);
+        await Db.SaveChangesAsync();
+
+        var financas = await Jogo.MontarFinancas(P);
+        Assert.Contains(financas.Conselhos, c => c.Contains("reserva cobre", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(financas.Conselhos, c => c.Contains("avalanche") && c.Contains("Cartão"));
+        // avalanche: dívidas ordenadas por juros (cartão primeiro)
+        Assert.Equal("Cartão", financas.Dividas[0].Nome);
+    }
+}
+
+public class MenteTests : JogoServiceTestBase
+{
+    [Fact]
+    public async Task Trilha_NaoPodeSerSeguidaDuasVezes()
+    {
+        await Jogo.CriarHabilidade(P, "csharp", null);
+        await Db.SaveChangesAsync();
+        await Assert.ThrowsAsync<InvalidOperationException>(() => Jogo.CriarHabilidade(P, "csharp", null));
+    }
+
+    [Fact] // marco concluído: +50 XP +5 🪙, idempotente
+    public async Task ConcluirMarco_PagaUmaVez()
+    {
+        await Jogo.CriarHabilidade(P, "csharp", null);
+        await Db.SaveChangesAsync();
+        var habilidade = await Db.Habilidades.SingleAsync();
+        var xpAntes = P.XpTotal;
+
+        var eventos = await Jogo.ConcluirMarco(P, habilidade.Id, 0);
+        await Db.SaveChangesAsync();
+        Assert.Contains(eventos, e => e.Tipo == "marco");
+        Assert.Equal(xpAntes + 50, P.XpTotal);
+
+        eventos = await Jogo.ConcluirMarco(P, habilidade.Id, 0);
+        Assert.Empty(eventos);
+        Assert.Equal(xpAntes + 50, P.XpTotal);
+    }
+
+    [Fact] // habilidade personalizada não tem marco manual — destrava por horas de foco
+    public async Task MarcoManual_SoNasTrilhasDoCatalogo()
+    {
+        await Jogo.CriarHabilidade(P, null, "Xadrez");
+        await Db.SaveChangesAsync();
+        var habilidade = await Db.Habilidades.SingleAsync();
+        await Assert.ThrowsAsync<InvalidOperationException>(() => Jogo.ConcluirMarco(P, habilidade.Id, 0));
+    }
+
+    [Fact] // o tempo do Modo Foco é creditado à habilidade escolhida (PRD 4.4)
+    public async Task Foco_CreditaHorasNaHabilidade()
+    {
+        await Jogo.CriarHabilidade(P, null, "Xadrez");
+        await Db.SaveChangesAsync();
+        var habilidade = await Db.Habilidades.SingleAsync();
+
+        // 12 ciclos de 50 min = 10h → primeiro marco por horas
+        for (var i = 0; i < 12; i++)
+        {
+            await Jogo.IniciarFoco(P, "foco", habilidade.Id);
+            await Db.SaveChangesAsync();
+            Relogio.AvancarMinutos(50);
+            await Jogo.EncerrarFoco(P, abandonar: false);
+            await Db.SaveChangesAsync();
+            Relogio.AvancarMinutos(10);
+        }
+
+        var mente = await Jogo.MontarMente(P);
+        var dto = mente.Habilidades.Single();
+        Assert.Equal(10, dto.HorasFoco);
+        Assert.True(dto.Marcos[0].Concluido);   // 10h
+        Assert.False(dto.Marcos[1].Concluido);  // 25h
+        Assert.Equal(1, mente.MarcosConcluidos);
+    }
+
+    [Fact] // Conhecimento (PRD 3.1): livros + marcos → 4 pts cada
+    public async Task Conhecimento_UsaLivrosEMarcos()
+    {
+        await Jogo.CriarHabilidade(P, "react", null);
+        await Jogo.CriarLivro(P, "Clean Code", null);
+        await Db.SaveChangesAsync();
+        var habilidade = await Db.Habilidades.SingleAsync();
+        var livro = await Db.Livros.SingleAsync();
+
+        var eventos = await Jogo.ConcluirLivro(P, livro.Id);
+        await Db.SaveChangesAsync();
+        Assert.Contains(eventos, e => e.Tipo == "livroConcluido");
+        Assert.Contains(eventos, e => e.Tipo == "conquista" && e.Nome == "Primeira página virada");
+
+        await Jogo.ConcluirMarco(P, habilidade.Id, 0);
+        await Db.SaveChangesAsync();
+
+        var estado = await Jogo.MontarEstado(P);
+        Assert.Equal(8, estado.Atributos.First(a => a.Id == "conhecimento").Valor); // 1 livro + 1 marco
+    }
+
+    [Fact] // Carisma: consistência de interações em 30 dias; 1 por dia
+    public async Task InteracaoSocial_AlimentaOCarisma()
+    {
+        await Jogo.RegistrarInteracaoSocial(P);
+        await Db.SaveChangesAsync();
+        await Assert.ThrowsAsync<InvalidOperationException>(() => Jogo.RegistrarInteracaoSocial(P));
+
+        for (var i = 0; i < 14; i++)
+        {
+            Relogio.AvancarDias(1);
+            await Jogo.RegistrarInteracaoSocial(P);
+            await Db.SaveChangesAsync();
+        }
+
+        var estado = await Jogo.MontarEstado(P);
+        Assert.Equal(50, estado.Atributos.First(a => a.Id == "carisma").Valor); // 15/30 dias
+    }
+}

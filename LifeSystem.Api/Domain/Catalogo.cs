@@ -97,6 +97,14 @@ public static class Catalogo
         new("dez60", "10 km abaixo de 60 min", "🏃", "10 km em menos de uma hora"),
         new("km100mes", "100 km no mês", "🛣️", "100 km acumulados em 30 dias"),
         new("meia21k", "Primeira meia-maratona", "🏅", "21,1 km numa corrida só"),
+        // Fase 3 — Mente e Bolso (PRD 4.1 e 4.4)
+        new("livro1", "Primeira página virada", "📕", "Primeiro livro concluído"),
+        new("livros10", "Biblioteca viva", "📚", "10 livros concluídos"),
+        new("marcos10", "Trilha aberta", "🌳", "10 marcos da árvore de conhecimento"),
+        new("dividaZero", "Corrente quebrada", "⛓️", "Primeira dívida quitada"),
+        new("reserva6m", "Fortaleza financeira", "🏰", "Reserva de emergência de 6 meses"),
+        new("nivelA", "Nível A", "💎", "Nível Financeiro A ou S"),
+        new("social30", "Presença constante", "🤝", "30 dias de interações sociais em 30 dias"),
         // A surpresa é parte da recompensa (PRD 3.5): aparece como ??? até despertar
         new("semPontosFracos", "Sem Pontos Fracos", "✨", "Despertou o Avatar Transcendente", Oculta: true),
     ];
@@ -113,7 +121,7 @@ public static class Catalogo
         new("conhecimento", "Conhecimento", "📚", true),
         new("espirito", "Espírito", "🙏", true),
         new("financas", "Finanças", "💰", true),
-        new("carisma", "Carisma", "🤝", false), // fonte de dados só na Fase 3
+        new("carisma", "Carisma", "🤝", true), // Fase 3: interações sociais registradas (PRD 3.1)
     ];
 
     // Loja inicial (exemplos do PRD 3.8)

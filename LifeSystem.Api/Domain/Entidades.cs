@@ -35,6 +35,9 @@ public class Personagem
     public bool RankingOptIn { get; set; }          // participar dos rankings é opt-in (PRD 4.3)
     public DateTime? AvisoSaudeAceitoEm { get; set; } // aceite do disclaimer de dieta/treino (PRD 4.5 ⚠️)
 
+    // Fase 3 — Mente e Bolso
+    public DateTime? AvisoFinancasAceitoEm { get; set; } // aceite do disclaimer financeiro (PRD 4.5 ⚠️ — por módulo)
+
     public List<MissaoLog> Missoes { get; set; } = [];
     public List<ChefeInstancia> Chefes { get; set; } = [];
     public List<ConquistaDesbloqueada> Conquistas { get; set; } = [];
@@ -42,6 +45,7 @@ public class Personagem
     public List<TransacaoMoedas> Transacoes { get; set; } = [];
     public List<SessaoFoco> SessoesFoco { get; set; } = [];
     public PerfilCorporal? PerfilCorporal { get; set; }
+    public PerfilFinanceiro? PerfilFinanceiro { get; set; }
 }
 
 public class MissaoLog
@@ -161,4 +165,82 @@ public class SessaoFoco
     public DateTime IniciadaEm { get; set; }
     public DateTime? EncerradaEm { get; set; }
     public string Status { get; set; } = "ativa"; // ativa | completa | abandonada
+    public int? HabilidadeId { get; set; }       // Fase 3: tempo creditado à habilidade estudada (PRD 4.4)
+}
+
+// ---------- Fase 3 — Mente e Bolso (PRD 4.1 e 4.4) ----------
+
+/// <summary>Dados financeiros do jogador (PRD 4.1) — base do diagnóstico e do orçamento de recompensa (PRD 3.8).</summary>
+public class PerfilFinanceiro
+{
+    public int Id { get; set; }
+    public int PersonagemId { get; set; }
+    public decimal RendaMensal { get; set; }
+    public decimal DespesasFixas { get; set; }
+    public decimal DespesasVariaveis { get; set; }
+    public decimal OrcamentoRecompensa { get; set; } // teto mensal da conversão de moedas (PRD 3.8)
+    public DateTime AtualizadoEm { get; set; } = DateTime.UtcNow;
+}
+
+/// <summary>Dívida para o método avalanche (PRD 4.1) — quitada vira um "chefe" derrotado.</summary>
+public class Divida
+{
+    public int Id { get; set; }
+    public int PersonagemId { get; set; }
+    public string Nome { get; set; } = "";
+    public decimal ValorAtual { get; set; }
+    public double JurosPctMes { get; set; }
+    public DateTime? QuitadaEm { get; set; }
+    public DateTime CriadaEm { get; set; } = DateTime.UtcNow;
+}
+
+/// <summary>Movimento das economias (positivo = aporte, negativo = retirada). Alimenta a taxa de poupança do mês.</summary>
+public class AporteEconomia
+{
+    public int Id { get; set; }
+    public int PersonagemId { get; set; }
+    public decimal Valor { get; set; }
+    public DateOnly Data { get; set; }
+    public DateTime CriadoEm { get; set; } = DateTime.UtcNow;
+}
+
+/// <summary>Habilidade da árvore de conhecimento (PRD 4.4). TrilhaId aponta para o catálogo; null = personalizada.</summary>
+public class Habilidade
+{
+    public int Id { get; set; }
+    public int PersonagemId { get; set; }
+    public string? TrilhaId { get; set; }
+    public string Nome { get; set; } = "";
+    public string Emoji { get; set; } = "📖";
+    public DateTime CriadaEm { get; set; } = DateTime.UtcNow;
+    public List<MarcoConcluido> Marcos { get; set; } = [];
+}
+
+/// <summary>Marco de trilha do catálogo concluído manualmente (personalizadas destravam por horas de foco).</summary>
+public class MarcoConcluido
+{
+    public int Id { get; set; }
+    public int HabilidadeId { get; set; }
+    public int MarcoIndice { get; set; }
+    public DateTime ConcluidoEm { get; set; } = DateTime.UtcNow;
+}
+
+/// <summary>Livro da lista de leitura — concluído alimenta o atributo 📚 Conhecimento (PRD 3.1).</summary>
+public class Livro
+{
+    public int Id { get; set; }
+    public int PersonagemId { get; set; }
+    public string Titulo { get; set; } = "";
+    public int? HabilidadeId { get; set; }
+    public DateTime? ConcluidoEm { get; set; }
+    public DateTime CriadoEm { get; set; } = DateTime.UtcNow;
+}
+
+/// <summary>Interação social do dia (1 toque) — consistência em 30 dias alimenta o 🤝 Carisma (PRD 3.1).</summary>
+public class InteracaoSocial
+{
+    public int Id { get; set; }
+    public int PersonagemId { get; set; }
+    public DateOnly Data { get; set; }
+    public DateTime CriadoEm { get; set; } = DateTime.UtcNow;
 }

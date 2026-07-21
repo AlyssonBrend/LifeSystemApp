@@ -17,6 +17,13 @@ public class AppDb(DbContextOptions<AppDb> options) : DbContext(options)
     public DbSet<RegistroCarga> RegistrosCarga => Set<RegistroCarga>();
     public DbSet<RegistroCardio> RegistrosCardio => Set<RegistroCardio>();
     public DbSet<Amizade> Amizades => Set<Amizade>();
+    public DbSet<PerfilFinanceiro> PerfisFinanceiros => Set<PerfilFinanceiro>();
+    public DbSet<Divida> Dividas => Set<Divida>();
+    public DbSet<AporteEconomia> Aportes => Set<AporteEconomia>();
+    public DbSet<Habilidade> Habilidades => Set<Habilidade>();
+    public DbSet<MarcoConcluido> MarcosConcluidos => Set<MarcoConcluido>();
+    public DbSet<Livro> Livros => Set<Livro>();
+    public DbSet<InteracaoSocial> InteracoesSociais => Set<InteracaoSocial>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
@@ -50,5 +57,17 @@ public class AppDb(DbContextOptions<AppDb> options) : DbContext(options)
         mb.Entity<RegistroCarga>().HasIndex(r => new { r.PersonagemId, r.ExercicioId, r.Data });
         mb.Entity<RegistroCardio>().HasIndex(r => new { r.PersonagemId, r.Data });
         mb.Entity<Amizade>().HasIndex(a => new { a.SolicitanteId, a.ConvidadoId }).IsUnique();
+
+        // Fase 3 — Mente e Bolso
+        mb.Entity<Personagem>()
+            .HasOne(p => p.PerfilFinanceiro).WithOne().HasForeignKey<PerfilFinanceiro>(pf => pf.PersonagemId);
+        mb.Entity<Divida>().HasIndex(d => d.PersonagemId);
+        mb.Entity<AporteEconomia>().HasIndex(a => new { a.PersonagemId, a.Data });
+        mb.Entity<Habilidade>().HasIndex(h => h.PersonagemId);
+        mb.Entity<Habilidade>()
+            .HasMany(h => h.Marcos).WithOne().HasForeignKey(m => m.HabilidadeId);
+        mb.Entity<MarcoConcluido>().HasIndex(m => new { m.HabilidadeId, m.MarcoIndice }).IsUnique();
+        mb.Entity<Livro>().HasIndex(l => l.PersonagemId);
+        mb.Entity<InteracaoSocial>().HasIndex(i => new { i.PersonagemId, i.Data }).IsUnique();
     }
 }

@@ -1,13 +1,11 @@
-import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { fmt } from '@/lib/api'
 import type { EstadoDto } from '@/lib/api'
 import { CLASSES, NOMES_ATRIBUTOS } from '@/lib/classes'
 
 interface Props {
   estado: EstadoDto
-  onEconomias: (valor: number) => void
+  onIrFinancas: () => void
   onAbrirClasses: () => void
 }
 
@@ -20,9 +18,8 @@ const CORES_FAIXA: Record<string, string> = {
   'Lendário': 'text-red-400',
 }
 
-export function PainelTab({ estado, onEconomias, onAbrirClasses }: Props) {
+export function PainelTab({ estado, onIrFinancas, onAbrirClasses }: Props) {
   const { personagem, atributos, missoesHoje, conquistas } = estado
-  const [economias, setEconomias] = useState(String(personagem.economias))
   const classe = CLASSES.find(c => c.id === personagem.classe)
   const concluidas = missoesHoje.filter(m => m.concluida).length
 
@@ -45,7 +42,7 @@ export function PainelTab({ estado, onEconomias, onAbrirClasses }: Props) {
                 <div className="h-full bg-gradient-to-r from-cyan-500 to-amber-400 transition-all" style={{ width: `${a.valor}%` }} />
               </div>
               <p className={`mt-1 text-[11px] uppercase tracking-wider ${a.temDados ? CORES_FAIXA[a.faixa] : 'text-zinc-500'}`}>
-                {a.temDados ? a.faixa : 'dados na Fase 3'}
+                {a.temDados ? a.faixa : 'sem dados ainda'}
               </p>
             </div>
           ))}
@@ -102,28 +99,13 @@ export function PainelTab({ estado, onEconomias, onAbrirClasses }: Props) {
         </section>
 
         <section className="border border-border bg-card p-4">
-          <h2 className="font-display text-sm uppercase tracking-[0.25em] text-muted-foreground">💰 Economias (registro manual)</h2>
+          <h2 className="font-display text-sm uppercase tracking-[0.25em] text-muted-foreground">💰 Economias</h2>
           <p className="mt-2 font-mono text-2xl text-amber-300">£{fmt(personagem.economias)}</p>
-          <form
-            className="mt-3 flex gap-2"
-            onSubmit={e => {
-              e.preventDefault()
-              const v = Number(economias)
-              if (!Number.isNaN(v)) onEconomias(v)
-            }}
-          >
-            <Input
-              type="number"
-              min="0"
-              value={economias}
-              onChange={e => setEconomias(e.target.value)}
-              className="font-mono"
-              aria-label="Total economizado"
-            />
-            <Button type="submit" variant="secondary" className="font-display uppercase tracking-widest">Salvar</Button>
-          </form>
+          <Button variant="secondary" className="mt-3 w-full font-display uppercase tracking-widest" onClick={onIrFinancas}>
+            Abrir o módulo Finanças
+          </Button>
           <p className="mt-2 text-xs text-muted-foreground">
-            Alimenta a conquista “Primeiros £10.000”. Diagnóstico completo chega na Fase 3.
+            Aportes, diagnóstico de saúde financeira, dívidas e conversão de moedas vivem na aba 💰 Finanças.
           </p>
         </section>
       </div>

@@ -151,7 +151,7 @@ api.MapPost("/missoes/{id}/checklist", (string id, CheckReq req, ClaimsPrincipal
     ComAcao(u, j, db, p => j.MarcarCheck(p, id, req.Indice, req.Marcado)));
 
 api.MapPost("/foco/iniciar", (FocoIniciarReq req, ClaimsPrincipal u, JogoService j, AppDb db) =>
-    ComAcao(u, j, db, p => j.IniciarFoco(p, req.Tipo)));
+    ComAcao(u, j, db, p => j.IniciarFoco(p, req.Tipo, req.HabilidadeId)));
 
 api.MapPost("/foco/encerrar", (FocoEncerrarReq req, ClaimsPrincipal u, JogoService j, AppDb db) =>
     ComAcao(u, j, db, p => j.EncerrarFoco(p, req.Abandonar)));
@@ -220,6 +220,90 @@ api.MapPost("/amigos", (AmigoReq req, ClaimsPrincipal u, JogoService j, AppDb db
 
 api.MapPost("/amigos/{amizadeId:int}/responder", (int amizadeId, ResponderAmizadeReq req, ClaimsPrincipal u, JogoService j, AppDb db) =>
     ComCorpo(u, j, db, p => j.ResponderAmizade(p, amizadeId, req.Aceitar)));
+
+// ---------- Fase 3 — Mente e Bolso (PRD 4.1 e 4.4) ----------
+// Mesmo fluxo do ComCorpo: a resposta inclui o estado do módulo (a aba atualiza numa ida só)
+
+static async Task<IResult> ComFinancas(
+    ClaimsPrincipal user, JogoService jogo, AppDb db,
+    Func<Personagem, Task<List<EventoDto>>>? acao = null)
+{
+    var p = await jogo.CarregarPersonagem(UsuarioId(user));
+    var eventos = await jogo.Sincronizar(p);
+    try
+    {
+        if (acao is not null) eventos.AddRange(await acao(p));
+    }
+    catch (Exception e) when (e is ArgumentException or InvalidOperationException)
+    {
+        await db.SaveChangesAsync();
+        return Results.BadRequest(new { erro = e.Message });
+    }
+    await db.SaveChangesAsync();
+    return Results.Ok(new AcaoResp(await jogo.MontarEstado(p), eventos, Financas: await jogo.MontarFinancas(p)));
+}
+
+static async Task<IResult> ComMente(
+    ClaimsPrincipal user, JogoService jogo, AppDb db,
+    Func<Personagem, Task<List<EventoDto>>>? acao = null)
+{
+    var p = await jogo.CarregarPersonagem(UsuarioId(user));
+    var eventos = await jogo.Sincronizar(p);
+    try
+    {
+        if (acao is not null) eventos.AddRange(await acao(p));
+    }
+    catch (Exception e) when (e is ArgumentException or InvalidOperationException)
+    {
+        await db.SaveChangesAsync();
+        return Results.BadRequest(new { erro = e.Message });
+    }
+    await db.SaveChangesAsync();
+    return Results.Ok(new AcaoResp(await jogo.MontarEstado(p), eventos, Mente: await jogo.MontarMente(p)));
+}
+
+var financas = api.MapGroup("/financas");
+
+financas.MapGet("", (ClaimsPrincipal u, JogoService j, AppDb db) =>
+    ComFinancas(u, j, db));
+
+financas.MapPut("/perfil", (PerfilFinanceiroReq req, ClaimsPrincipal u, JogoService j, AppDb db) =>
+    ComFinancas(u, j, db, p => j.DefinirPerfilFinanceiro(p, req)));
+
+financas.MapPost("/aviso", (ClaimsPrincipal u, JogoService j, AppDb db) =>
+    ComFinancas(u, j, db, p => j.AceitarAvisoFinancas(p)));
+
+financas.MapPost("/aporte", (AporteReq req, ClaimsPrincipal u, JogoService j, AppDb db) =>
+    ComFinancas(u, j, db, p => j.RegistrarAporte(p, req.Valor)));
+
+financas.MapPost("/dividas", (DividaReq req, ClaimsPrincipal u, JogoService j, AppDb db) =>
+    ComFinancas(u, j, db, p => j.CriarDivida(p, req.Nome, req.Valor, req.JurosPctMes)));
+
+financas.MapPost("/dividas/{dividaId:int}/pagar", (int dividaId, PagarDividaReq req, ClaimsPrincipal u, JogoService j, AppDb db) =>
+    ComFinancas(u, j, db, p => j.PagarDivida(p, dividaId, req.Valor)));
+
+financas.MapPost("/converter", (ConverterReq req, ClaimsPrincipal u, JogoService j, AppDb db) =>
+    ComFinancas(u, j, db, p => j.ConverterMoedas(p, req.Moedas)));
+
+var mente = api.MapGroup("/mente");
+
+mente.MapGet("", (ClaimsPrincipal u, JogoService j, AppDb db) =>
+    ComMente(u, j, db));
+
+mente.MapPost("/habilidades", (HabilidadeReq req, ClaimsPrincipal u, JogoService j, AppDb db) =>
+    ComMente(u, j, db, p => j.CriarHabilidade(p, req.TrilhaId, req.Nome)));
+
+mente.MapPost("/habilidades/{habilidadeId:int}/marcos/{indice:int}", (int habilidadeId, int indice, ClaimsPrincipal u, JogoService j, AppDb db) =>
+    ComMente(u, j, db, p => j.ConcluirMarco(p, habilidadeId, indice)));
+
+mente.MapPost("/livros", (LivroReq req, ClaimsPrincipal u, JogoService j, AppDb db) =>
+    ComMente(u, j, db, p => j.CriarLivro(p, req.Titulo, req.HabilidadeId)));
+
+mente.MapPost("/livros/{livroId:int}/concluir", (int livroId, ClaimsPrincipal u, JogoService j, AppDb db) =>
+    ComMente(u, j, db, p => j.ConcluirLivro(p, livroId)));
+
+mente.MapPost("/social", (ClaimsPrincipal u, JogoService j, AppDb db) =>
+    ComMente(u, j, db, p => j.RegistrarInteracaoSocial(p)));
 
 app.MapGet("/api/saude", () => Results.Ok(new { ok = true, agora = DateTime.UtcNow }));
 

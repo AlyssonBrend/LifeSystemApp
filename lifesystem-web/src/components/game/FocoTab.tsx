@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import type { EstadoDto, FocoDto } from '@/lib/api'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import type { EstadoDto, FocoDto, MenteDto } from '@/lib/api'
 
 interface Props {
   estado: EstadoDto
-  onIniciar: (tipo: 'foco' | 'descanso') => void
+  mente: MenteDto | null
+  onCarregarMente: () => void
+  onIniciar: (tipo: 'foco' | 'descanso', habilidadeId?: number | null) => void
   onEncerrar: (abandonar: boolean) => void
 }
 
@@ -91,8 +94,12 @@ function Cronometro({ sessao, onEncerrar }: { sessao: FocoDto; onEncerrar: (aban
   )
 }
 
-export function FocoTab({ estado, onIniciar, onEncerrar }: Props) {
+export function FocoTab({ estado, mente, onCarregarMente, onIniciar, onEncerrar }: Props) {
   const estudar = estado.missoesHoje.find(m => m.id === 'estudar')
+  const [habilidadeId, setHabilidadeId] = useState<string>('nenhuma')
+
+  // Fase 3 (PRD 4.4): o tempo de foco pode ser creditado a uma habilidade da árvore
+  useEffect(() => { if (!mente) onCarregarMente() }, [mente, onCarregarMente])
 
   if (estado.focoAtivo) return <Cronometro sessao={estado.focoAtivo} onEncerrar={onEncerrar} />
 
@@ -121,8 +128,27 @@ export function FocoTab({ estado, onIniciar, onEncerrar }: Props) {
           </div>
         )}
 
+        {mente && mente.habilidades.length > 0 && (
+          <div className="mt-4 text-left">
+            <p className="mb-1 text-xs text-muted-foreground">Creditar o tempo à habilidade (árvore de conhecimento):</p>
+            <Select value={habilidadeId} onValueChange={setHabilidadeId}>
+              <SelectTrigger aria-label="Habilidade estudada"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="nenhuma">Estudo geral (sem habilidade)</SelectItem>
+                {mente.habilidades.map(h => (
+                  <SelectItem key={h.id} value={String(h.id)}>{h.emoji} {h.nome} · {h.horasFoco.toLocaleString('pt-BR')}h</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
         <div className="mt-5 grid gap-2 sm:grid-cols-2">
-          <Button className="h-12 font-display text-base uppercase tracking-widest" onClick={() => onIniciar('foco')} data-testid="iniciar-foco">
+          <Button
+            className="h-12 font-display text-base uppercase tracking-widest"
+            onClick={() => onIniciar('foco', habilidadeId === 'nenhuma' ? null : Number(habilidadeId))}
+            data-testid="iniciar-foco"
+          >
             ⏱️ Focar 50min
           </Button>
           <Button variant="secondary" className="h-12 font-display text-base uppercase tracking-widest" onClick={() => onIniciar('descanso')}>

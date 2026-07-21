@@ -28,6 +28,7 @@ public partial class JogoService(AppDb db, IRelogio relogio)
             .Include(x => x.Conquistas)
             .Include(x => x.Loja.Where(i => i.Ativo))
             .Include(x => x.PerfilCorporal)
+            .Include(x => x.PerfilFinanceiro)
             .FirstAsync(x => x.UsuarioId == usuarioId);
         return p;
     }
@@ -281,9 +282,13 @@ public partial class JogoService(AppDb db, IRelogio relogio)
         var minutosEstudo30 = logs30.Where(m => m.MissaoId == "estudar").Sum(m => m.ProgressoMinutos);
         var inteligencia = Math.Min(100, (int)Math.Round(minutosEstudo30 / 60.0 / 60.0 * 100));
 
-        // Conhecimento: proxy por volume acumulado de estudo em 90 dias (100h = 100)
+        // Conhecimento: proxy por volume acumulado de estudo em 90 dias (100h = 100).
+        // Fase 3 (PRD 3.1): fórmula real — livros concluídos + marcos da árvore — quando há dados.
         var minutosEstudo90 = logs90.Where(m => m.MissaoId == "estudar").Sum(m => m.ProgressoMinutos);
         var conhecimento = Math.Min(100, (int)Math.Round(minutosEstudo90 / 60.0 / 100.0 * 100));
+        var (livrosConcluidos, marcosConcluidos) = await ContarLivrosEMarcos(p);
+        if (livrosConcluidos + marcosConcluidos > 0)
+            conhecimento = Math.Min(100, livrosConcluidos * 4 + marcosConcluidos * 4);
 
         // Disciplina (atributo central): streak atual + taxa de conclusão na janela de 90 dias.
         // Só as 6 missões padrão entram na taxa — a missão de classe é bônus, não obrigação.
@@ -322,6 +327,20 @@ public partial class JogoService(AppDb db, IRelogio relogio)
             resistencia = FormulasCorpo.ResistenciaDe(melhorPace5k.Value, km30);
         }
 
+        // Fase 3 (PRD 4.1): com perfil financeiro, Finanças = score do Nível Financeiro (E–S);
+        // sem perfil, mantém o proxy de consistência de trabalho.
+        var financas = PctConsistencia30("trabalhar");
+        if (p.PerfilFinanceiro is { } perfilFin && perfilFin.RendaMensal > 0)
+        {
+            var diagFin = FormulasFinancas.Diagnostico(perfilFin, p.Economias, await AportesDoMes(p, hoje));
+            financas = diagFin.Score;
+        }
+
+        // Fase 3 (PRD 3.1): Carisma = constância das interações sociais nos últimos 30 dias
+        var diasSociais30 = await db.InteracoesSociais
+            .CountAsync(i => i.PersonagemId == p.Id && i.Data >= inicio30);
+        var carisma = Math.Min(100, (int)Math.Round(diasSociais30 / 30.0 * 100));
+
         var valores = new Dictionary<string, int>
         {
             ["forca"] = forca,
@@ -332,8 +351,8 @@ public partial class JogoService(AppDb db, IRelogio relogio)
             ["inteligencia"] = inteligencia,
             ["conhecimento"] = conhecimento,
             ["espirito"] = PctConsistencia30("espiritualidade"),
-            ["financas"] = PctConsistencia30("trabalhar"),
-            ["carisma"] = 0, // fonte de dados chega na Fase 3
+            ["financas"] = financas,
+            ["carisma"] = carisma,
             ["disciplina"] = disciplina,
         };
 
@@ -547,15 +566,19 @@ public partial class JogoService(AppDb db, IRelogio relogio)
 
     // ---------- Modo Foco 50/10 (PRD 3.9) ----------
 
-    public async Task<List<EventoDto>> IniciarFoco(Personagem p, string tipo)
+    public async Task<List<EventoDto>> IniciarFoco(Personagem p, string tipo, int? habilidadeId = null)
     {
         if (tipo is not ("foco" or "descanso")) throw new ArgumentException("Tipo inválido");
         var ativa = await db.SessoesFoco
             .AnyAsync(s => s.PersonagemId == p.Id && s.Status == "ativa");
         if (ativa) throw new InvalidOperationException("Já existe uma sessão ativa");
+        // Fase 3 (PRD 4.4): o tempo da sessão é creditado à habilidade estudada
+        if (habilidadeId is { } hid && !await db.Habilidades.AnyAsync(h => h.Id == hid && h.PersonagemId == p.Id))
+            throw new ArgumentException("Habilidade não encontrada");
         db.SessoesFoco.Add(new SessaoFoco
         {
             PersonagemId = p.Id, Tipo = tipo, IniciadaEm = relogio.AgoraUtc,
+            HabilidadeId = tipo == "foco" ? habilidadeId : null,
         });
         return [];
     }

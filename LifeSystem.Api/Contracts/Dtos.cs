@@ -11,7 +11,7 @@ public record ClasseReq(string Classe);
 public record RecompensaReq(string Texto);
 public record EconomiasReq(decimal Valor);
 public record ItemLojaReq(string Nome, int Preco);
-public record FocoIniciarReq(string Tipo); // "foco" | "descanso"
+public record FocoIniciarReq(string Tipo, int? HabilidadeId = null); // "foco" | "descanso" · Fase 3: crédito por habilidade
 public record FocoEncerrarReq(bool Abandonar);
 
 // ---------- Ações da Fase 2 — Corpo ----------
@@ -21,6 +21,15 @@ public record CardioReq(double DistanciaKm, double DuracaoMin);
 public record AmigoReq(string Codigo);
 public record ResponderAmizadeReq(bool Aceitar);
 public record RankingOptInReq(bool OptIn);
+
+// ---------- Ações da Fase 3 — Mente e Bolso ----------
+public record PerfilFinanceiroReq(decimal RendaMensal, decimal DespesasFixas, decimal DespesasVariaveis, decimal OrcamentoRecompensa);
+public record AporteReq(decimal Valor);
+public record DividaReq(string Nome, decimal Valor, double JurosPctMes);
+public record PagarDividaReq(decimal Valor);
+public record ConverterReq(int Moedas);
+public record HabilidadeReq(string? TrilhaId, string? Nome); // trilha do catálogo OU nome personalizado
+public record LivroReq(string Titulo, int? HabilidadeId);
 
 // ---------- Estado ----------
 public record PersonagemDto(
@@ -98,7 +107,44 @@ public record CorpoDto(
     List<string> Conselhos, string CodigoAmigo, bool RankingOptIn, bool AvisoSaudeAceito,
     List<AmigoDto> Amigos, List<RankingDto> RankingsForca, List<RankingDto> RankingsCardio);
 
+// ---------- Estado da Fase 3 — Bolso ----------
+
+public record PerfilFinanceiroDto(decimal RendaMensal, decimal DespesasFixas, decimal DespesasVariaveis, decimal OrcamentoRecompensa);
+
+public record DiagnosticoDto(
+    double MesesReserva, decimal ReservaMeta, decimal ReservaFaltante,
+    double TaxaPoupancaPct, double MetaPoupancaPct, double PctNecessidades, double PctDesejos,
+    int Score, string Nivel, bool MetaDoMesBatida);
+
+public record DividaDto(int Id, string Nome, decimal ValorAtual, double JurosPctMes, bool Quitada);
+
+public record AporteDto(int Id, decimal Valor, string Data);
+
+public record ConversaoDto(decimal ConvertidoMesLibras, decimal TetoMesLibras, decimal LiberadoTotalLibras);
+
+public record FinancasDto(
+    PerfilFinanceiroDto? Perfil, DiagnosticoDto? Diagnostico,
+    List<DividaDto> Dividas, List<AporteDto> Aportes, decimal AportesDoMes,
+    ConversaoDto Conversao, List<string> Conselhos, bool AvisoAceito);
+
+// ---------- Estado da Fase 3 — Mente ----------
+
+public record TrilhaDto(string Id, string Nome, string Emoji, string[] Marcos, bool JaAdicionada);
+
+public record MarcoDto(int Indice, string Nome, bool Concluido);
+
+public record HabilidadeDto(
+    int Id, string? TrilhaId, string Nome, string Emoji,
+    double HorasFoco, List<MarcoDto> Marcos);
+
+public record LivroDto(int Id, string Titulo, int? HabilidadeId, bool Concluido);
+
+public record MenteDto(
+    List<HabilidadeDto> Habilidades, List<TrilhaDto> Trilhas,
+    List<LivroDto> Livros, int LivrosConcluidos, int MarcosConcluidos,
+    bool InteracaoHoje, int DiasSociais30, List<string> Conselhos);
+
 // Eventos disparados por uma ação (o frontend usa para animações/toasts)
 public record EventoDto(string Tipo, string? Titulo = null, int? Level = null, string? Nome = null, string? Emoji = null, string? Recompensa = null);
 
-public record AcaoResp(EstadoDto Estado, List<EventoDto> Eventos, CorpoDto? Corpo = null);
+public record AcaoResp(EstadoDto Estado, List<EventoDto> Eventos, CorpoDto? Corpo = null, FinancasDto? Financas = null, MenteDto? Mente = null);

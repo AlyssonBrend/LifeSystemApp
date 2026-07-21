@@ -89,11 +89,64 @@ export interface CorpoDto {
   rankingsCardio: RankingDto[]
 }
 
+// ---------- Fase 3 — Bolso ----------
+
+export interface PerfilFinanceiroDto {
+  rendaMensal: number; despesasFixas: number; despesasVariaveis: number; orcamentoRecompensa: number
+}
+
+export interface DiagnosticoDto {
+  mesesReserva: number; reservaMeta: number; reservaFaltante: number
+  taxaPoupancaPct: number; metaPoupancaPct: number; pctNecessidades: number; pctDesejos: number
+  score: number; nivel: string; metaDoMesBatida: boolean
+}
+
+export interface DividaDto { id: number; nome: string; valorAtual: number; jurosPctMes: number; quitada: boolean }
+export interface AporteDto { id: number; valor: number; data: string }
+export interface ConversaoDto { convertidoMesLibras: number; tetoMesLibras: number; liberadoTotalLibras: number }
+
+export interface FinancasDto {
+  perfil: PerfilFinanceiroDto | null
+  diagnostico: DiagnosticoDto | null
+  dividas: DividaDto[]
+  aportes: AporteDto[]
+  aportesDoMes: number
+  conversao: ConversaoDto
+  conselhos: string[]
+  avisoAceito: boolean
+}
+
+// ---------- Fase 3 — Mente ----------
+
+export interface TrilhaDto { id: string; nome: string; emoji: string; marcos: string[]; jaAdicionada: boolean }
+export interface MarcoDto { indice: number; nome: string; concluido: boolean }
+
+export interface HabilidadeDto {
+  id: number; trilhaId: string | null; nome: string; emoji: string
+  horasFoco: number; marcos: MarcoDto[]
+}
+
+export interface LivroDto { id: number; titulo: string; habilidadeId: number | null; concluido: boolean }
+
+export interface MenteDto {
+  habilidades: HabilidadeDto[]
+  trilhas: TrilhaDto[]
+  livros: LivroDto[]
+  livrosConcluidos: number
+  marcosConcluidos: number
+  interacaoHoje: boolean
+  diasSociais30: number
+  conselhos: string[]
+}
+
 export interface EventoDto {
   tipo: string; titulo?: string; level?: number; nome?: string; emoji?: string; recompensa?: string
 }
 
-export interface AcaoResp { estado: EstadoDto; eventos: EventoDto[]; corpo: CorpoDto | null }
+export interface AcaoResp {
+  estado: EstadoDto; eventos: EventoDto[]
+  corpo: CorpoDto | null; financas: FinancasDto | null; mente: MenteDto | null
+}
 
 // ---------- Sessão ----------
 
@@ -149,8 +202,8 @@ export const jogo = {
     requisicao<AcaoResp>(`/api/jogo/missoes/${id}/concluir`, { method: 'POST' }),
   marcarCheck: (id: string, indice: number, marcado: boolean) =>
     requisicao<AcaoResp>(`/api/jogo/missoes/${id}/checklist`, { method: 'POST', body: JSON.stringify({ indice, marcado }) }),
-  iniciarFoco: (tipo: 'foco' | 'descanso') =>
-    requisicao<AcaoResp>('/api/jogo/foco/iniciar', { method: 'POST', body: JSON.stringify({ tipo }) }),
+  iniciarFoco: (tipo: 'foco' | 'descanso', habilidadeId?: number | null) =>
+    requisicao<AcaoResp>('/api/jogo/foco/iniciar', { method: 'POST', body: JSON.stringify({ tipo, habilidadeId: habilidadeId ?? null }) }),
   encerrarFoco: (abandonar: boolean) =>
     requisicao<AcaoResp>('/api/jogo/foco/encerrar', { method: 'POST', body: JSON.stringify({ abandonar }) }),
   escolherClasse: (classe: string) =>
@@ -180,6 +233,34 @@ export const jogo = {
     requisicao<AcaoResp>('/api/jogo/amigos', { method: 'POST', body: JSON.stringify({ codigo }) }),
   responderAmizade: (amizadeId: number, aceitar: boolean) =>
     requisicao<AcaoResp>(`/api/jogo/amigos/${amizadeId}/responder`, { method: 'POST', body: JSON.stringify({ aceitar }) }),
+
+  // ---------- Fase 3 — Bolso ----------
+  financas: () => requisicao<AcaoResp>('/api/jogo/financas'),
+  definirPerfilFinanceiro: (perfil: PerfilFinanceiroDto) =>
+    requisicao<AcaoResp>('/api/jogo/financas/perfil', { method: 'PUT', body: JSON.stringify(perfil) }),
+  aceitarAvisoFinancas: () =>
+    requisicao<AcaoResp>('/api/jogo/financas/aviso', { method: 'POST' }),
+  registrarAporte: (valor: number) =>
+    requisicao<AcaoResp>('/api/jogo/financas/aporte', { method: 'POST', body: JSON.stringify({ valor }) }),
+  criarDivida: (nome: string, valor: number, jurosPctMes: number) =>
+    requisicao<AcaoResp>('/api/jogo/financas/dividas', { method: 'POST', body: JSON.stringify({ nome, valor, jurosPctMes }) }),
+  pagarDivida: (dividaId: number, valor: number) =>
+    requisicao<AcaoResp>(`/api/jogo/financas/dividas/${dividaId}/pagar`, { method: 'POST', body: JSON.stringify({ valor }) }),
+  converterMoedas: (moedas: number) =>
+    requisicao<AcaoResp>('/api/jogo/financas/converter', { method: 'POST', body: JSON.stringify({ moedas }) }),
+
+  // ---------- Fase 3 — Mente ----------
+  mente: () => requisicao<AcaoResp>('/api/jogo/mente'),
+  criarHabilidade: (trilhaId: string | null, nome: string | null) =>
+    requisicao<AcaoResp>('/api/jogo/mente/habilidades', { method: 'POST', body: JSON.stringify({ trilhaId, nome }) }),
+  concluirMarco: (habilidadeId: number, indice: number) =>
+    requisicao<AcaoResp>(`/api/jogo/mente/habilidades/${habilidadeId}/marcos/${indice}`, { method: 'POST' }),
+  criarLivro: (titulo: string, habilidadeId: number | null) =>
+    requisicao<AcaoResp>('/api/jogo/mente/livros', { method: 'POST', body: JSON.stringify({ titulo, habilidadeId }) }),
+  concluirLivro: (livroId: number) =>
+    requisicao<AcaoResp>(`/api/jogo/mente/livros/${livroId}/concluir`, { method: 'POST' }),
+  registrarSocial: () =>
+    requisicao<AcaoResp>('/api/jogo/mente/social', { method: 'POST' }),
 }
 
 /** Pace em s/km → "5:32" */

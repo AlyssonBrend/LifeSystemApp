@@ -4,9 +4,11 @@ import { Button } from '@/components/ui/button'
 import { Toaster } from '@/components/ui/sonner'
 import { toast } from 'sonner'
 import { ApiErro, fmt, jogo, sessao } from '@/lib/api'
-import type { AcaoResp, CorpoDto, EstadoDto, EventoDto } from '@/lib/api'
+import type { AcaoResp, CorpoDto, EstadoDto, EventoDto, FinancasDto, MenteDto } from '@/lib/api'
 import { AuthView } from '@/AuthView'
 import { CorpoTab } from '@/components/game/CorpoTab'
+import { FinancasTab } from '@/components/game/FinancasTab'
+import { MenteTab } from '@/components/game/MenteTab'
 import { PainelTab } from '@/components/game/PainelTab'
 import { MissoesTab } from '@/components/game/MissoesTab'
 import { ChefeTab } from '@/components/game/ChefeTab'
@@ -37,6 +39,8 @@ function RaizComToaster({ children }: { children: React.ReactNode }) {
 function GameView({ onSair }: { onSair: () => void }) {
   const [estado, setEstado] = useState<EstadoDto | null>(null)
   const [corpo, setCorpo] = useState<CorpoDto | null>(null)
+  const [financas, setFinancas] = useState<FinancasDto | null>(null)
+  const [mente, setMente] = useState<MenteDto | null>(null)
   const [erro, setErro] = useState('')
   const [levelUp, setLevelUp] = useState<EventoDto | null>(null)
   const [vitoria, setVitoria] = useState<EventoDto | null>(null)
@@ -86,15 +90,32 @@ function GameView({ onSair }: { onSair: () => void }) {
         case 'convite':
           toast.success(`🤝 Convite enviado para ${ev.nome}!`)
           break
+        case 'metaPoupanca':
+          toast.success('🐷 META DE POUPANÇA DO MÊS BATIDA!', { description: '+300 XP · +30 🪙 — missão mensal cumprida', duration: 6000 })
+          break
+        case 'dividaQuitada':
+          toast.success(`⛓️ DÍVIDA QUITADA — ${ev.nome}`, { description: 'Um chefe a menos no bolso: +1.000 XP · +200 🪙', duration: 8000 })
+          break
+        case 'conversao':
+          toast.success('💷 Moedas convertidas!', { description: ev.titulo })
+          break
+        case 'marco':
+          toast.success(`🌳 Marco concluído — ${ev.nome}`, { description: `${ev.titulo} · +50 XP · +5 🪙` })
+          break
+        case 'livroConcluido':
+          toast.success(`📕 Livro concluído: ${ev.nome}`, { description: '+100 XP · +10 🪙 — o Conhecimento agradece' })
+          break
       }
     }
   }, [])
 
   const despachar = useCallback(async (acao: () => Promise<AcaoResp>) => {
     try {
-      const { estado: novo, eventos, corpo: novoCorpo } = await acao()
+      const { estado: novo, eventos, corpo: novoCorpo, financas: novasFinancas, mente: novaMente } = await acao()
       setEstado(novo)
       if (novoCorpo) setCorpo(novoCorpo)
+      if (novasFinancas) setFinancas(novasFinancas)
+      if (novaMente) setMente(novaMente)
       setErro('')
       processarEventos(eventos, novo)
     } catch (e) {
@@ -171,20 +192,22 @@ function GameView({ onSair }: { onSair: () => void }) {
 
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-8">
         <Tabs value={aba} onValueChange={setAba}>
-          <TabsList className="mb-5 grid h-auto w-full grid-cols-7 border border-border bg-card p-0 font-display">
-            <TabsTrigger value="painel" className="rounded-none py-2.5 uppercase tracking-wider data-[state=active]:bg-secondary">🧬 <span className="ml-1.5 hidden md:inline">Painel</span></TabsTrigger>
-            <TabsTrigger value="missoes" className="rounded-none py-2.5 uppercase tracking-wider data-[state=active]:bg-secondary">⚔️ <span className="ml-1.5 hidden md:inline">Missões</span></TabsTrigger>
-            <TabsTrigger value="corpo" className="rounded-none py-2.5 uppercase tracking-wider data-[state=active]:bg-secondary">🏋️ <span className="ml-1.5 hidden md:inline">Corpo</span></TabsTrigger>
-            <TabsTrigger value="foco" className="rounded-none py-2.5 uppercase tracking-wider data-[state=active]:bg-secondary">⏱️ <span className="ml-1.5 hidden md:inline">Foco</span></TabsTrigger>
-            <TabsTrigger value="chefe" className="rounded-none py-2.5 uppercase tracking-wider data-[state=active]:bg-secondary">👹 <span className="ml-1.5 hidden md:inline">Chefe</span></TabsTrigger>
-            <TabsTrigger value="loja" className="rounded-none py-2.5 uppercase tracking-wider data-[state=active]:bg-secondary">🪙 <span className="ml-1.5 hidden md:inline">Loja</span></TabsTrigger>
-            <TabsTrigger value="conquistas" className="rounded-none py-2.5 uppercase tracking-wider data-[state=active]:bg-secondary">🏆 <span className="ml-1.5 hidden md:inline">Conquistas</span></TabsTrigger>
+          <TabsList className="mb-5 grid h-auto w-full grid-cols-9 border border-border bg-card p-0 font-display">
+            <TabsTrigger value="painel" className="rounded-none py-2.5 uppercase tracking-wider data-[state=active]:bg-secondary">🧬 <span className="ml-1.5 hidden lg:inline">Painel</span></TabsTrigger>
+            <TabsTrigger value="missoes" className="rounded-none py-2.5 uppercase tracking-wider data-[state=active]:bg-secondary">⚔️ <span className="ml-1.5 hidden lg:inline">Missões</span></TabsTrigger>
+            <TabsTrigger value="corpo" className="rounded-none py-2.5 uppercase tracking-wider data-[state=active]:bg-secondary">🏋️ <span className="ml-1.5 hidden lg:inline">Corpo</span></TabsTrigger>
+            <TabsTrigger value="mente" className="rounded-none py-2.5 uppercase tracking-wider data-[state=active]:bg-secondary">🧠 <span className="ml-1.5 hidden lg:inline">Mente</span></TabsTrigger>
+            <TabsTrigger value="financas" className="rounded-none py-2.5 uppercase tracking-wider data-[state=active]:bg-secondary">💰 <span className="ml-1.5 hidden lg:inline">Finanças</span></TabsTrigger>
+            <TabsTrigger value="foco" className="rounded-none py-2.5 uppercase tracking-wider data-[state=active]:bg-secondary">⏱️ <span className="ml-1.5 hidden lg:inline">Foco</span></TabsTrigger>
+            <TabsTrigger value="chefe" className="rounded-none py-2.5 uppercase tracking-wider data-[state=active]:bg-secondary">👹 <span className="ml-1.5 hidden lg:inline">Chefe</span></TabsTrigger>
+            <TabsTrigger value="loja" className="rounded-none py-2.5 uppercase tracking-wider data-[state=active]:bg-secondary">🪙 <span className="ml-1.5 hidden lg:inline">Loja</span></TabsTrigger>
+            <TabsTrigger value="conquistas" className="rounded-none py-2.5 uppercase tracking-wider data-[state=active]:bg-secondary">🏆 <span className="ml-1.5 hidden lg:inline">Conquistas</span></TabsTrigger>
           </TabsList>
 
           <TabsContent value="painel">
             <PainelTab
               estado={estado}
-              onEconomias={v => despachar(() => jogo.definirEconomias(v))}
+              onIrFinancas={() => setAba('financas')}
               onAbrirClasses={() => setClassesAberto(true)}
             />
           </TabsContent>
@@ -209,10 +232,38 @@ function GameView({ onSair }: { onSair: () => void }) {
               onResponder={(id, aceitar) => despachar(() => jogo.responderAmizade(id, aceitar))}
             />
           </TabsContent>
+          <TabsContent value="mente">
+            <MenteTab
+              mente={mente}
+              onCarregar={() => despachar(jogo.mente)}
+              onHabilidade={(trilhaId, nome) => despachar(() => jogo.criarHabilidade(trilhaId, nome))}
+              onMarco={(id, i) => despachar(() => jogo.concluirMarco(id, i))}
+              onLivro={(titulo, hid) => despachar(() => jogo.criarLivro(titulo, hid))}
+              onConcluirLivro={id => despachar(() => jogo.concluirLivro(id))}
+              onSocial={() => despachar(jogo.registrarSocial)}
+              onAbrirFoco={() => setAba('foco')}
+            />
+          </TabsContent>
+          <TabsContent value="financas">
+            <FinancasTab
+              financas={financas}
+              moedas={p.moedas}
+              economias={p.economias}
+              onCarregar={() => despachar(jogo.financas)}
+              onAviso={() => despachar(jogo.aceitarAvisoFinancas)}
+              onPerfil={perfil => despachar(() => jogo.definirPerfilFinanceiro(perfil))}
+              onAporte={v => despachar(() => jogo.registrarAporte(v))}
+              onDivida={(nome, valor, juros) => despachar(() => jogo.criarDivida(nome, valor, juros))}
+              onPagar={(id, valor) => despachar(() => jogo.pagarDivida(id, valor))}
+              onConverter={m => despachar(() => jogo.converterMoedas(m))}
+            />
+          </TabsContent>
           <TabsContent value="foco">
             <FocoTab
               estado={estado}
-              onIniciar={tipo => despachar(() => jogo.iniciarFoco(tipo))}
+              mente={mente}
+              onCarregarMente={() => despachar(jogo.mente)}
+              onIniciar={(tipo, habilidadeId) => despachar(() => jogo.iniciarFoco(tipo, habilidadeId))}
               onEncerrar={abandonar => despachar(() => jogo.encerrarFoco(abandonar))}
             />
           </TabsContent>
@@ -234,7 +285,7 @@ function GameView({ onSair }: { onSair: () => void }) {
 
       <footer className="mx-auto max-w-6xl px-4 pb-6 sm:px-8">
         <p className="text-xs text-muted-foreground">
-          Life System · Fases 1–2 (Jogo + Corpo) · progresso salvo no servidor · regras do PRD v0.9
+          Life System · Fases 1–3 (Jogo + Corpo + Mente e Bolso) · progresso salvo no servidor · regras do PRD v0.9
         </p>
       </footer>
 
