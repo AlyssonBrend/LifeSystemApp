@@ -10,7 +10,7 @@ namespace LifeSystem.Api.Services;
 /// Todas as regras de jogo (PRD seção 6: nunca no frontend).
 /// Cada ação sincroniza streak/chefe/foco com a data real antes de executar.
 /// </summary>
-public partial class JogoService(AppDb db, IRelogio relogio)
+public partial class JogoService(AppDb db, IRelogio relogio, IClienteIa ia)
 {
     private const int MinutosFoco = 50;
     private const int MinutosDescanso = 10;

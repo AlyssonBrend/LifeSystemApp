@@ -32,6 +32,7 @@ static string ConverterDatabaseUrl(string url)
 builder.Services.AddScoped<JogoService>();
 builder.Services.AddSingleton<TokenService>();
 builder.Services.AddSingleton<IRelogio, RelogioJogo>();
+builder.Services.AddSingleton<IClienteIa, ClienteIaAnthropic>(); // Fase 4 — IA Mentora (PRD 4.5)
 
 // Sem chave não sobe: evita rodar produção com a chave de exemplo
 var jwtChave = builder.Configuration["Jwt:Chave"];
@@ -304,6 +305,35 @@ mente.MapPost("/livros/{livroId:int}/concluir", (int livroId, ClaimsPrincipal u,
 
 mente.MapPost("/social", (ClaimsPrincipal u, JogoService j, AppDb db) =>
     ComMente(u, j, db, p => j.RegistrarInteracaoSocial(p)));
+
+// ---------- Fase 4 — IA Mentora (PRD 4.5) ----------
+
+static async Task<IResult> ComMentor(
+    ClaimsPrincipal user, JogoService jogo, AppDb db,
+    Func<Personagem, Task<List<EventoDto>>>? acao = null)
+{
+    var p = await jogo.CarregarPersonagem(UsuarioId(user));
+    var eventos = await jogo.Sincronizar(p);
+    try
+    {
+        if (acao is not null) eventos.AddRange(await acao(p));
+    }
+    catch (Exception e) when (e is ArgumentException or InvalidOperationException)
+    {
+        await db.SaveChangesAsync();
+        return Results.BadRequest(new { erro = e.Message });
+    }
+    await db.SaveChangesAsync();
+    return Results.Ok(new AcaoResp(await jogo.MontarEstado(p), eventos, Mentor: await jogo.MontarMentor(p)));
+}
+
+var mentor = api.MapGroup("/mentor");
+
+mentor.MapGet("", (ClaimsPrincipal u, JogoService j, AppDb db) =>
+    ComMentor(u, j, db));
+
+mentor.MapPost("/analisar", (ClaimsPrincipal u, JogoService j, AppDb db) =>
+    ComMentor(u, j, db, p => j.AnalisarComMentor(p)));
 
 app.MapGet("/api/saude", () => Results.Ok(new { ok = true, agora = DateTime.UtcNow }));
 

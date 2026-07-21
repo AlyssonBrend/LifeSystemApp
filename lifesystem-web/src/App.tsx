@@ -4,11 +4,12 @@ import { Button } from '@/components/ui/button'
 import { Toaster } from '@/components/ui/sonner'
 import { toast } from 'sonner'
 import { ApiErro, fmt, jogo, sessao } from '@/lib/api'
-import type { AcaoResp, CorpoDto, EstadoDto, EventoDto, FinancasDto, MenteDto } from '@/lib/api'
+import type { AcaoResp, CorpoDto, EstadoDto, EventoDto, FinancasDto, MenteDto, MentorDto } from '@/lib/api'
 import { AuthView } from '@/AuthView'
 import { CorpoTab } from '@/components/game/CorpoTab'
 import { FinancasTab } from '@/components/game/FinancasTab'
 import { MenteTab } from '@/components/game/MenteTab'
+import { MentorTab } from '@/components/game/MentorTab'
 import { PainelTab } from '@/components/game/PainelTab'
 import { MissoesTab } from '@/components/game/MissoesTab'
 import { ChefeTab } from '@/components/game/ChefeTab'
@@ -41,6 +42,7 @@ function GameView({ onSair }: { onSair: () => void }) {
   const [corpo, setCorpo] = useState<CorpoDto | null>(null)
   const [financas, setFinancas] = useState<FinancasDto | null>(null)
   const [mente, setMente] = useState<MenteDto | null>(null)
+  const [mentor, setMentor] = useState<MentorDto | null>(null)
   const [erro, setErro] = useState('')
   const [levelUp, setLevelUp] = useState<EventoDto | null>(null)
   const [vitoria, setVitoria] = useState<EventoDto | null>(null)
@@ -105,17 +107,21 @@ function GameView({ onSair }: { onSair: () => void }) {
         case 'livroConcluido':
           toast.success(`📕 Livro concluído: ${ev.nome}`, { description: '+100 XP · +10 🪙 — o Conhecimento agradece' })
           break
+        case 'mentor':
+          toast.success('🧙 O Mentor falou!', { description: 'Sua análise personalizada está pronta.' })
+          break
       }
     }
   }, [])
 
   const despachar = useCallback(async (acao: () => Promise<AcaoResp>) => {
     try {
-      const { estado: novo, eventos, corpo: novoCorpo, financas: novasFinancas, mente: novaMente } = await acao()
+      const { estado: novo, eventos, corpo: novoCorpo, financas: novasFinancas, mente: novaMente, mentor: novoMentor } = await acao()
       setEstado(novo)
       if (novoCorpo) setCorpo(novoCorpo)
       if (novasFinancas) setFinancas(novasFinancas)
       if (novaMente) setMente(novaMente)
+      if (novoMentor) setMentor(novoMentor)
       setErro('')
       processarEventos(eventos, novo)
     } catch (e) {
@@ -192,12 +198,13 @@ function GameView({ onSair }: { onSair: () => void }) {
 
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-8">
         <Tabs value={aba} onValueChange={setAba}>
-          <TabsList className="mb-5 grid h-auto w-full grid-cols-9 border border-border bg-card p-0 font-display">
+          <TabsList className="mb-5 grid h-auto w-full grid-cols-10 border border-border bg-card p-0 font-display">
             <TabsTrigger value="painel" className="rounded-none py-2.5 uppercase tracking-wider data-[state=active]:bg-secondary">🧬 <span className="ml-1.5 hidden lg:inline">Painel</span></TabsTrigger>
             <TabsTrigger value="missoes" className="rounded-none py-2.5 uppercase tracking-wider data-[state=active]:bg-secondary">⚔️ <span className="ml-1.5 hidden lg:inline">Missões</span></TabsTrigger>
             <TabsTrigger value="corpo" className="rounded-none py-2.5 uppercase tracking-wider data-[state=active]:bg-secondary">🏋️ <span className="ml-1.5 hidden lg:inline">Corpo</span></TabsTrigger>
             <TabsTrigger value="mente" className="rounded-none py-2.5 uppercase tracking-wider data-[state=active]:bg-secondary">🧠 <span className="ml-1.5 hidden lg:inline">Mente</span></TabsTrigger>
             <TabsTrigger value="financas" className="rounded-none py-2.5 uppercase tracking-wider data-[state=active]:bg-secondary">💰 <span className="ml-1.5 hidden lg:inline">Finanças</span></TabsTrigger>
+            <TabsTrigger value="mentor" className="rounded-none py-2.5 uppercase tracking-wider data-[state=active]:bg-secondary">🧙 <span className="ml-1.5 hidden lg:inline">Mentor</span></TabsTrigger>
             <TabsTrigger value="foco" className="rounded-none py-2.5 uppercase tracking-wider data-[state=active]:bg-secondary">⏱️ <span className="ml-1.5 hidden lg:inline">Foco</span></TabsTrigger>
             <TabsTrigger value="chefe" className="rounded-none py-2.5 uppercase tracking-wider data-[state=active]:bg-secondary">👹 <span className="ml-1.5 hidden lg:inline">Chefe</span></TabsTrigger>
             <TabsTrigger value="loja" className="rounded-none py-2.5 uppercase tracking-wider data-[state=active]:bg-secondary">🪙 <span className="ml-1.5 hidden lg:inline">Loja</span></TabsTrigger>
@@ -258,6 +265,13 @@ function GameView({ onSair }: { onSair: () => void }) {
               onConverter={m => despachar(() => jogo.converterMoedas(m))}
             />
           </TabsContent>
+          <TabsContent value="mentor">
+            <MentorTab
+              mentor={mentor}
+              onCarregar={() => despachar(jogo.mentor)}
+              onAnalisar={() => despachar(jogo.analisarComMentor)}
+            />
+          </TabsContent>
           <TabsContent value="foco">
             <FocoTab
               estado={estado}
@@ -285,7 +299,7 @@ function GameView({ onSair }: { onSair: () => void }) {
 
       <footer className="mx-auto max-w-6xl px-4 pb-6 sm:px-8">
         <p className="text-xs text-muted-foreground">
-          Life System · Fases 1–3 (Jogo + Corpo + Mente e Bolso) · progresso salvo no servidor · regras do PRD v0.9
+          Life System · Fases 1–4 (Jogo + Corpo + Mente e Bolso + IA Mentora) · progresso salvo no servidor · regras do PRD v0.9
         </p>
       </footer>
 

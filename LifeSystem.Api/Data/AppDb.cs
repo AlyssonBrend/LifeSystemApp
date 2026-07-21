@@ -24,6 +24,7 @@ public class AppDb(DbContextOptions<AppDb> options) : DbContext(options)
     public DbSet<MarcoConcluido> MarcosConcluidos => Set<MarcoConcluido>();
     public DbSet<Livro> Livros => Set<Livro>();
     public DbSet<InteracaoSocial> InteracoesSociais => Set<InteracaoSocial>();
+    public DbSet<ConselhoMentor> ConselhosMentor => Set<ConselhoMentor>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
@@ -69,5 +70,8 @@ public class AppDb(DbContextOptions<AppDb> options) : DbContext(options)
         mb.Entity<MarcoConcluido>().HasIndex(m => new { m.HabilidadeId, m.MarcoIndice }).IsUnique();
         mb.Entity<Livro>().HasIndex(l => l.PersonagemId);
         mb.Entity<InteracaoSocial>().HasIndex(i => new { i.PersonagemId, i.Data }).IsUnique();
+
+        // Fase 4 — IA Mentora
+        mb.Entity<ConselhoMentor>().HasIndex(c => new { c.PersonagemId, c.Data });
     }
 }

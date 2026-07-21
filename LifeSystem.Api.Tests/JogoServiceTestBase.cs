@@ -17,12 +17,31 @@ public class RelogioFake : IRelogio
     public void AvancarMinutos(int minutos) => AgoraUtc = AgoraUtc.AddMinutes(minutos);
 }
 
+/// <summary>IA fake (Fase 4): registra o contexto recebido e devolve uma resposta fixa — sem rede.</summary>
+public class ClienteIaFake : IClienteIa
+{
+    public bool Configurado { get; set; } = true;
+    public string Resposta { get; set; } = "## ⚔️ Análise da semana\nConselho de teste do Mentor.";
+    public string? UltimoSistema { get; private set; }
+    public string? UltimoContexto { get; private set; }
+    public int Chamadas { get; private set; }
+
+    public Task<string> Gerar(string sistema, string contexto)
+    {
+        Chamadas++;
+        UltimoSistema = sistema;
+        UltimoContexto = contexto;
+        return Task.FromResult(Resposta);
+    }
+}
+
 /// <summary>Banco SQLite in-memory + personagem novo por teste.</summary>
 public abstract class JogoServiceTestBase : IDisposable
 {
     private readonly SqliteConnection _conexao;
     protected readonly AppDb Db;
     protected readonly RelogioFake Relogio = new();
+    protected readonly ClienteIaFake Ia = new();
     protected readonly JogoService Jogo;
     protected readonly Personagem P;
 
@@ -40,7 +59,7 @@ public abstract class JogoServiceTestBase : IDisposable
         Db.Personagens.Add(P);
         Db.SaveChanges();
 
-        Jogo = new JogoService(Db, Relogio);
+        Jogo = new JogoService(Db, Relogio, Ia);
     }
 
     public void Dispose() => _conexao.Dispose();

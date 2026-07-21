@@ -139,13 +139,24 @@ export interface MenteDto {
   conselhos: string[]
 }
 
+// ---------- Fase 4 — IA Mentora ----------
+
+export interface ConselhoMentorDto { id: number; conteudo: string; criadoEm: string }
+
+export interface MentorDto {
+  configurado: boolean
+  limiteDiario: number
+  restantesHoje: number
+  historico: ConselhoMentorDto[]
+}
+
 export interface EventoDto {
   tipo: string; titulo?: string; level?: number; nome?: string; emoji?: string; recompensa?: string
 }
 
 export interface AcaoResp {
   estado: EstadoDto; eventos: EventoDto[]
-  corpo: CorpoDto | null; financas: FinancasDto | null; mente: MenteDto | null
+  corpo: CorpoDto | null; financas: FinancasDto | null; mente: MenteDto | null; mentor: MentorDto | null
 }
 
 // ---------- Sessão ----------
@@ -261,6 +272,11 @@ export const jogo = {
     requisicao<AcaoResp>(`/api/jogo/mente/livros/${livroId}/concluir`, { method: 'POST' }),
   registrarSocial: () =>
     requisicao<AcaoResp>('/api/jogo/mente/social', { method: 'POST' }),
+
+  // ---------- Fase 4 — IA Mentora ----------
+  mentor: () => requisicao<AcaoResp>('/api/jogo/mentor'),
+  analisarComMentor: () =>
+    requisicao<AcaoResp>('/api/jogo/mentor/analisar', { method: 'POST' }),
 }
 
 /** Pace em s/km → "5:32" */

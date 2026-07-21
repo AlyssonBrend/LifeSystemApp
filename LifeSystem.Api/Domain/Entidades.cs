@@ -244,3 +244,15 @@ public class InteracaoSocial
     public DateOnly Data { get; set; }
     public DateTime CriadoEm { get; set; } = DateTime.UtcNow;
 }
+
+// ---------- Fase 4 — IA Mentora (PRD 4.5) ----------
+
+/// <summary>Conselho gerado pela IA Mentora (AdviceLog do PRD) — histórico auditável e limite diário.</summary>
+public class ConselhoMentor
+{
+    public int Id { get; set; }
+    public int PersonagemId { get; set; }
+    public string Conteudo { get; set; } = "";
+    public DateOnly Data { get; set; }           // dia do jogador — base do limite diário
+    public DateTime CriadoEm { get; set; } = DateTime.UtcNow;
+}

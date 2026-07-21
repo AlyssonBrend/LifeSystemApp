@@ -144,7 +144,15 @@ public record MenteDto(
     List<LivroDto> Livros, int LivrosConcluidos, int MarcosConcluidos,
     bool InteracaoHoje, int DiasSociais30, List<string> Conselhos);
 
+// ---------- Estado da Fase 4 — IA Mentora ----------
+
+public record ConselhoMentorDto(int Id, string Conteudo, DateTime CriadoEm);
+
+public record MentorDto(
+    bool Configurado, int LimiteDiario, int RestantesHoje,
+    List<ConselhoMentorDto> Historico);
+
 // Eventos disparados por uma ação (o frontend usa para animações/toasts)
 public record EventoDto(string Tipo, string? Titulo = null, int? Level = null, string? Nome = null, string? Emoji = null, string? Recompensa = null);
 
-public record AcaoResp(EstadoDto Estado, List<EventoDto> Eventos, CorpoDto? Corpo = null, FinancasDto? Financas = null, MenteDto? Mente = null);
+public record AcaoResp(EstadoDto Estado, List<EventoDto> Eventos, CorpoDto? Corpo = null, FinancasDto? Financas = null, MenteDto? Mente = null, MentorDto? Mentor = null);
